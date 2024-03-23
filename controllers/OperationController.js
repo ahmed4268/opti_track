@@ -6,26 +6,66 @@ const Technician = require('../models/techModel');
 const Vehicle = require('../models/vehModel');
 const tech = require("../models/techModel");
 exports.getAllOperation = catchAsync(async (req, res, next) => {
-    const features = new APIFeatures(operation.find(), req.query)
+    const features = new APIFeatures(operation.find().populate({
+        path: 'technicians',
+        select: 'Fullname lastName firstName phoneNumber',
+        options: { virtuals: true }
+    })
+        .populate({
+            path: 'responsable',
+            options: { virtuals: true },
+            select: 'Fullname lastName firstName phoneNumber'
+        })
+
+        .populate({
+            path: 'driver',
+            select: 'Fullname lastName firstName ',
+            options: { virtuals: true }
+        })
+        .populate({
+            path: 'vehicle',
+            select: 'licensePlate brand model seats'
+        })
+        .populate({
+            path: 'site',
+            select: 'name address state city'
+        }), req.query)
         .filter()
         .sort()
         .limitFields()
         .paginate();
     const operations = await features.query;
-
     // SEND RESPONSE
-    res.status(200).json({
-        status: 'success',
-        results: operations.length,
-        data: {
+    res.status(200).json(
+
             operations
-        }
-    });
+
+    );
     next()
 });
 
 exports.getOperation = catchAsync(async (req, res, next) => {
-    const Operation = await operation.findById(req.params.id);
+    const Operation = await operation.findById(req.params.id).populate({
+    path: 'technicians',
+        select: 'Fullname lastName firstName phoneNumber'
+})
+        .populate({
+            path: 'responsable',
+            select: 'Fullname lastName firstName '
+        })
+        .populate({
+            path: 'driver',
+            select: 'Fullname lastName firstName '
+        })
+        .populate({
+            path: 'vehicle',
+            select: 'licensePlate brand seats'
+        })
+        .populate({
+            path: 'site',
+            select: 'name address state city'
+        });
+
 
     if (!Operation) {
         return next('No operation found with that ID', 404);
@@ -79,7 +119,9 @@ exports.createOperation = catchAsync(async (req, res, next) => {
 
 exports.updateOperation = catchAsync(async (req, res, next) => {
     let { site, operationDays, technicians, vehicle } = req.body;
-    const existingOperation = await operation.findById(req.params.id);
+    const existingOperation = await operation.findByIdAndUpdate(req.params.id, req.body, {
+        runValidators: false
+    });
     const operationId = existingOperation._id;
     if (site !== undefined) {
         await Site.findByIdAndUpdate(existingOperation.site, {$pull: {pastOperations: req.params.id}});
@@ -141,12 +183,12 @@ exports.updateOperation = catchAsync(async (req, res, next) => {
 
 
             const oldTechnicians = existingOperation.technicians;
-            const remainedTechnicians = oldTechnicians.filter(oldTech => technicians.some(newTech => newTech._id.equals(oldTech._id)));
-            const removedTechnicians = oldTechnicians.filter(oldTech => !technicians.some(newTech => newTech._id.equals(oldTech._id)));
-            const addedOrReplacedTechnicians = technicians.filter(newTech => !oldTechnicians.some(oldTech => oldTech._id.equals(newTech._id)));
+            const remainedTechnicians = oldTechnicians.filter(oldTech => technicians.some(newTech => newTech === oldTech));
+            const removedTechnicians = oldTechnicians.filter(oldTech => !technicians.some(newTech => newTech === oldTech));
+            const addedOrReplacedTechnicians = technicians.filter(newTech => !oldTechnicians.some(oldTech => newTech === oldTech));
 
 
-            const result = await existingOperation.updateOne({_id: req.params.id}, req.body);
+//const result = await operation.updateOne({_id: req.params.id}, req.body);
 
             if (remainedTechnicians.length > 0) {
                 //send the update information
@@ -171,7 +213,7 @@ exports.updateOperation = catchAsync(async (req, res, next) => {
                 });
             }
             await updateTechniciansUnavailabilityAndPastOperations(operationId, technicians, operationDays);
-            const result = await existingOperation.updateOne({_id: req.params.id}, req.body);
+        //    const result = await operation.updateOne({_id: req.params.id}, req.body);
             //send the update information tcm
 
         }
@@ -211,12 +253,12 @@ exports.updateOperation = catchAsync(async (req, res, next) => {
             }
             await updateTechniciansUnavailabilityAndPastOperations(operationId, technicians, operationDays);
             const oldTechnicians = existingOperation.technicians;
-            const remainedTechnicians = oldTechnicians.filter(oldTech => technicians.some(newTech => newTech._id.equals(oldTech._id)));
-            const removedTechnicians = oldTechnicians.filter(oldTech => !technicians.some(newTech => newTech._id.equals(oldTech._id)));
-            const addedOrReplacedTechnicians = technicians.filter(newTech => !oldTechnicians.some(oldTech => oldTech._id.equals(newTech._id)));
+            const remainedTechnicians = oldTechnicians.filter(oldTech => technicians.some(newTech => newTech === oldTech));
+            const removedTechnicians = oldTechnicians.filter(oldTech => !technicians.some(newTech => newTech === oldTech));
+            const addedOrReplacedTechnicians = technicians.filter(newTech => !oldTechnicians.some(oldTech => newTech === oldTech));
 
 
-            const result = await existingOperation.updateOne({_id: req.params.id}, req.body);
+//const result = await operation.updateOne({_id: req.params.id}, req.body);
 
             if (remainedTechnicians.length > 0) {
                 //send the update information
@@ -236,55 +278,57 @@ exports.updateOperation = catchAsync(async (req, res, next) => {
         return next('No operation found with that ID', 404);
     }
 
-    res.status(200).json({
-        status: 'success',
-        data: {
-            result
-        }
-    });
+    res.status(200);
+
+
     next()
 });
 
-exports.deleteOperation= catchAsync(async (req, res, next) => {
-    const Operation = await operation.findByIdAndDelete(req.params.id);
+exports.deleteOperation = catchAsync(async (req, res, next) => {
+    const Operation = await operation.findById(req.params.id);
+    const operationId = req.params.id;
 
     if (!Operation) {
         return next('No Operation found with that ID', 404);
-    }
-    else {
-        if (Operation.status === 'Planned') {
-            const operationId = Operation._id;
-
-            // Update technicians to remove the operation from their unavailability
-            await pullTechnicians(Operation);
-
-
-            // Update vehicle to remove the operation from its unavailability
-            await pullVehicle(Operation);
-
-            // Update site to remove the operation from its pastOperations
-            await Site.findByIdAndUpdate(Operation.site, {$pull: {pastOperations: operationId}});
-        } else {
+    } else {
+        if (Operation.status === 'Completed') {
             return res.status(400).json({
                 status: 'error',
-                message: "u can't delete in progress or completed operation",
+                message: "You can't delete a completed operation",
             });
+        } else if (Operation.status === 'In Progress') {
+            // If status is "In Progress", change status to "Canceled"
+            Operation.status = 'Canceled';
+            await Operation.save();
+        } else if (Operation.status === 'Planned') {
+            // If status is "Planned", delete the operation
+            await Operation.remove();
         }
+
+        // Update technicians to remove the operation from their unavailability
+        await pullTechnicians(Operation);
+
+        // Update vehicle to remove the operation from its unavailability
+        await pullVehicle(Operation);
+
+        // Update site to remove the operation from its pastOperations
+        await Site.findByIdAndUpdate(Operation.site, { $pull: { pastOperations: operationId } });
     }
+
     res.status(204).json({
         status: 'success',
         data: null
     });
-    next()
 });
+
 exports.completeOperation = async (req, res, next) => {
     try {
         const operationId = req.params.id;
-        const Operation = await operation.findByIdAndUpdate(operationId,req.body);
+        const Operation = await operation.findByIdAndUpdate(operationId,{ status: 'Completed' });
         if (!Operation) {
             return res.status(404).json({ message: 'Operation not found' });
         }
-        console.log(Operation.technicians)
+
         await Technician.updateMany(
             { _id: { $in: Operation.technicians } },
             {
@@ -313,6 +357,74 @@ exports.completeOperation = async (req, res, next) => {
         console.error('Error completing operation:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
+};
+exports.archivedOperation = async (req, res, next) => {
+    const operations = await operation.find({ status: { $in: ['Completed', 'Canceled'] } }).populate({
+        path: 'technicians',
+        select: 'Fullname lastName firstName phoneNumber',
+        options: { virtuals: true }
+    })
+        .populate({
+            path: 'responsable',
+            options: { virtuals: true },
+            select: 'Fullname lastName firstName phoneNumber'
+        })
+
+        .populate({
+            path: 'driver',
+            select: 'Fullname lastName firstName ',
+            options: { virtuals: true }
+        })
+        .populate({
+            path: 'vehicle',
+            select: 'licensePlate brand model seats'
+        })
+        .populate({
+            path: 'site',
+            select: 'name address state city'
+        });
+
+
+    res.status(200).json(
+
+        operations
+
+    );
+    next()
+};
+exports.Dashboard = async (req, res, next) => {
+    const operations = await operation.find({ status: { $in: ['Planned', 'In Progress'] } }).populate({
+        path: 'technicians',
+        select: 'Fullname lastName firstName phoneNumber',
+        options: { virtuals: true }
+    })
+        .populate({
+            path: 'responsable',
+            options: { virtuals: true },
+            select: 'Fullname lastName firstName phoneNumber'
+        })
+
+        .populate({
+            path: 'driver',
+            select: 'Fullname lastName firstName ',
+            options: { virtuals: true }
+        })
+        .populate({
+            path: 'vehicle',
+            select: 'licensePlate brand model seats'
+        })
+        .populate({
+            path: 'site',
+            select: 'name address state city'
+        });
+
+
+    res.status(200).json(
+
+        operations
+
+    );
+    next()
 };
 
 async function technicienVerification(technicians,operationDays) {

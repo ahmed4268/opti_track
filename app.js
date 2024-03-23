@@ -1,5 +1,6 @@
 const express = require('express');
 const morgan = require('morgan');
+const cors = require('cors');
 
 const siteRouter = require('./routes/siteRoutes');
 const techRouter = require('./routes/techRoutes');
@@ -9,7 +10,7 @@ const operationRouter = require('./routes/OperationRoute');
 
 
 const app = express();
-
+app.use(cors());
 // 1) MIDDLEWARES
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));

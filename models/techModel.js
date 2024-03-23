@@ -75,7 +75,18 @@ const {ObjectId} = require("mongodb");
         ],
 
 
-    }, { timestamps: true }); // Add timestamps for createdAt and updatedAt
+    },
+        { timestamps: true,
+            toJSON: { virtuals: true },
+           }
+
+
+
+);
+technicianSchema.virtual('Fullname').get(function () {
+
+    return `${this.firstName} ${this.lastName}`;
+});// Add timestamps for createdAt and updatedAt
 
 // Create the Technician model
     const Technician = mongoose.model('Technician', technicianSchema);

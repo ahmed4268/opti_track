@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const tech = require('../models/techModel');
 const vehi = require('../models/vehModel');
+const Site = require('../models/siteModel');
 
 const operationSchema = new mongoose.Schema({
     name: {
@@ -16,21 +17,20 @@ const operationSchema = new mongoose.Schema({
     },
     Description: {
         type: String,
-
     },
 
 
     site: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Site',
+        ref: 'site',
         required: true,
     },
     technicians: [
-        {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'Technician',
-            required:true,
-        },
+             {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'Technician',
+
+            },
 
     ],
     responsable: {
@@ -48,6 +48,7 @@ const operationSchema = new mongoose.Schema({
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Vehicle',
         },
+
 
     status: {
         type: String,
@@ -210,6 +211,13 @@ operationSchema.virtual('duration').get(function () {
     const durationInDays = durationInMilliseconds / (1000 * 60 * 60 * 24);
     return Math.round(durationInDays);
 });
+// operationSchema.virtual('info').get(function () {
+//     const start = this.startTime;
+//     const end = this.endTime;
+//     const durationInMilliseconds = end - start;
+//     const durationInDays = durationInMilliseconds / (1000 * 60 * 60 * 24);
+//     return Math.round(durationInDays);
+// });
 const Operation = mongoose.model('Operation', operationSchema);
 
 module.exports = Operation;

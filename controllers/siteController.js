@@ -11,13 +11,11 @@ exports.getAllSite = catchAsync(async (req, res, next) => {
   const sites = await features.query;
 
   // SEND RESPONSE
-  res.status(200).json({
-    status: 'success',
-    results: sites.length,
-    data: {
+  res.status(200).json(
+
       sites
-    }
-  });
+
+  );
   next()
 });
 

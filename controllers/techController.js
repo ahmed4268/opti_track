@@ -50,7 +50,7 @@ exports.createtech= catchAsync(async (req, res, next) => {
 
 exports.updatetech = catchAsync(async (req, res, next) => {
     const Tech = await tech.findByIdAndUpdate(req.params.id, req.body, {
-        new: true,
+
         runValidators: true
     });
 
