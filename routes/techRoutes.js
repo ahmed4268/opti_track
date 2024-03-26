@@ -13,4 +13,5 @@ router
     .get(techController.gettech)
     .patch(techController.updatetech)
     .delete(techController.deletetech);
+router.post('/availabletech', techController.getAvailableTech);
 module.exports = router;

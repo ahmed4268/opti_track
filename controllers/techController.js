@@ -20,6 +20,29 @@ exports.getAlltech = catchAsync(async (req, res, next) => {
     });
     next()
 });
+exports.getAvailableTech = catchAsync(async (req, res, next) => {
+
+    try {
+        const operationDays = req.body.operationDays; // Get operation days array from request body
+if (!operationDays) {
+    console.log("ya3tik 3asba ya ahmed" +
+        "" +
+        "")
+    return next('Please provide operation days in the request body.', 400);
+}
+        // Query the database for technicians who are available
+        const availableTechnicians = await tech.find({
+            disponibility: "disponible", // Technician is available
+            unavailability: { $not: { $elemMatch: { date: { $in: operationDays } } } }
+        });
+
+        res.json(availableTechnicians); // Return array of technician objects as JSON response
+    } catch (error) {
+        console.error("Error fetching available technicians:", error);
+        res.status(500).json({ error: "Failed to fetch available technicians from the database." });
+    }
+});
+
 
 exports.gettech = catchAsync(async (req, res, next) => {
     const Tech = await tech.findById(req.params.id);
@@ -42,7 +65,7 @@ exports.createtech= catchAsync(async (req, res, next) => {
     res.status(201).json({
         status: 'success',
         data: {
-            site: newTech
+            tech: newTech
         }
     });
     next()

@@ -438,8 +438,7 @@ async function technicienVerification(technicians,operationDays) {
             } else if ( technician.disponibility !== "disponible") {
                 return technician._id;
             } else {
-                // console.log("azrzfc")
-                // console.log(technician.unavailability[0].date)
+
                 for (const date of operationDays) {
                     const formattedDate = new Date(date).toISOString();
                     if (technician.unavailability.some(unavailableDate => unavailableDate.date.toISOString() === formattedDate)) {

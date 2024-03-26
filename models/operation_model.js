@@ -55,13 +55,13 @@ const operationSchema = new mongoose.Schema({
         enum: ['Planned', 'In Progress', 'Completed',"Canceled"],
         default: 'Planned',
     },
-        operationDays:[
-            {
-                type: Date,
-                required:true,
-            },
-
-        ],
+        // operationDays:[
+        //     {
+        //         type: Date,
+        //         required:true,
+        //     },
+        //
+        // ],
 
     startTime: {
         type: Date,
