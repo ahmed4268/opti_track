@@ -5,6 +5,9 @@ const Site = require('../models/siteModel');
 const Technician = require('../models/techModel');
 const Vehicle = require('../models/vehModel');
 const tech = require("../models/techModel");
+const Conge = require('../models/congeModel');
+const axios = require("axios"); // Import the Congé model
+
 exports.getAllOperation = catchAsync(async (req, res, next) => {
     const features = new APIFeatures(operation.find().populate({
         path: 'technicians',
@@ -78,11 +81,28 @@ exports.getOperation = catchAsync(async (req, res, next) => {
         }
     });
 });
+const credentials = Buffer.from('ahmedhorizon2021@gmail.com:dHaB5uAZ9tC!M4K').toString('base64');
 
+async function sendRequest(method, url, payload) {
+    try {
+        const response = await axios({
+            method,
+            url,
+            data: payload,
+            headers: {
+                Authorization: `Basic ${credentials}`
+            }
+        });
+        console.log('Request successful:', response.data);
+        return response.data;
+    } catch (error) {
+        console.error('Error sending request:', error);
+    }
+}
 exports.createOperation = catchAsync(async (req, res, next) => {
     const newOperation = await operation.create(req.body);
 
-    const { technicians, vehicle, site, operationDays } = req.body;
+    const { technicians, vehicle, site, operationDays,name } = req.body;
     try {
         await checkVehicleAvailability(vehicle,operationDays);
         console.log('Vehicle is available.');
@@ -101,11 +121,62 @@ exports.createOperation = catchAsync(async (req, res, next) => {
     await Vehicle.updateOne({ _id: vehicle }, { $push: { pastOperations: newOperation._id } });
 
     await Site.updateOne({ _id: site }, { $push: { pastOperations: newOperation._id } });
+    const sitee = await Site.findById(site);
+    if (!sitee) {
+        return res.status(404).json({
+            status: 'error',
+            message: 'Site not found',
+        });
+    }
 
-    // tcm firebase notification
-    // ...
+    const groupPayload = { name: name };
+    const groupResponse = await sendRequest('post',"https://demo4.traccar.org/api/groups", groupPayload);
+    const group = groupResponse.id;
 
+    const permissionPayload = {
+        groupId: group,
+        geofenceId: sitee.geofence,
+    };
+    await sendRequest('post',"https://demo4.traccar.org/api/permissions", permissionPayload);
 
+    const requests = technicians.map(async (technicianId) => {
+        const tech = await Technician.findById(technicianId);
+        if (!tech) {
+            console.error(`Technician with ID ${technicianId} not found`);
+            return;
+        }
+
+        const payload = {
+            id: tech.device,
+            groupId: group,
+            name: tech.Fullname,
+            uniqueId: tech._id
+        };
+
+        return sendRequest('put',`https://demo4.traccar.org/api/devices/${tech.device}`, payload);
+    });
+
+    await Promise.allSettled(requests);
+
+    const veh = await Vehicle.findById(vehicle);
+    if (!veh) {
+        console.error(`Vehicle with ID ${vehicle} not found`);
+        return;
+    }
+
+    const vehiclePayload = {
+        id: veh.device,
+        groupId: group,
+        name: veh.licensePlate,
+        uniqueId: veh._id
+    };
+
+    await sendRequest('put',`https://demo4.traccar.org/api/devices/${veh.device}`, vehiclePayload);
+
+    newOperation.group = group;
+    await newOperation.save();
+
+    console.log('Operation created successfully:', newOperation);
 
     res.status(201).json({
         status: 'success',
@@ -114,175 +185,350 @@ exports.createOperation = catchAsync(async (req, res, next) => {
         }
     });
 
-    next()
+    next();
 });
+
 
 exports.updateOperation = catchAsync(async (req, res, next) => {
-    let { site, operationDays, technicians, vehicle } = req.body;
-    const existingOperation = await operation.findByIdAndUpdate(req.params.id, req.body, {
-        runValidators: false
-    });
-    const operationId = existingOperation._id;
-    if (site !== undefined) {
-        await Site.findByIdAndUpdate(existingOperation.site, {$pull: {pastOperations: req.params.id}});
-        await Site.updateOne({_id: site}, {$push: {pastOperations: req.params.id}});
-    }
-    if (operationDays !== undefined) {
 
-        if (vehicle !== undefined) {
+        const { site, operationDays, technicians, vehicle } = req.body;
+        const operationId = req.params.id;
 
-            try {
-                await checkVehicleAvailability(vehicle, operationDays);
-                console.log('Vehicle is available.');
-            } catch (error) {
-                console.error(error.message);
-                return res.status(400).json({
-                    status: 'error',
-                    message: error.message,
-                });
-
-            }
-            await pullVehicle(existingOperation);
-
-            await updateVehicleUnavailability(vehicle, operationDays, operationId);
-            await Vehicle.updateOne({ _id: vehicle }, { $push: { pastOperations:operationId } });
-
-
-        } else {
-            await pullVehicle(existingOperation);
-            try {
-                await checkVehicleAvailability(existingOperation.vehicle, operationDays);
-                console.log('Vehicle is available.');
-            } catch (error) {
-                console.error(error.message);
-                return res.status(400).json({
-                    status: 'error',
-                    message: error.message,
-                });
-
-            }
-            await updateVehicleUnavailability(vehicle, operationDays, operationId);
-            await Vehicle.updateOne({ _id: vehicle }, { $push: { pastOperations:operationId } });
-
+        const existingOperation = await operation.findById(operationId);
+        if (!existingOperation) {
+            return next('No operation found with that ID', 404);
         }
 
-        if (technicians !== undefined) {
+        try {
             await pullTechnicians(existingOperation);
-            try {
-                await technicienVerification(technicians, operationDays);
-                console.log('All technicians are available.');
-            } catch (error) {
-                console.error(error.message);
-                return res.status(400).json({
-                    status: 'error',
-                    message: error.message,
-                });
+            await pullVehicle(existingOperation);
+            await checkVehicleAvailability(vehicle, operationDays);
+            await technicienVerification(technicians, operationDays);
+        } catch (error) {
+            return res.status(400).json({
+                status: 'error',
+                message: error.message,
+            });
+        }
+    async function updateSite(oldSiteId, newSiteId, operationId) {
+        // Remove the operation from the old site's past operations
 
-            }
-            await updateTechniciansUnavailabilityAndPastOperations(operationId, technicians, operationDays);
+        await Site.findByIdAndUpdate(oldSiteId, { $pull: { pastOperations: operationId } });
 
+        // Add the operation to the new site's past operations
+        await Site.findByIdAndUpdate(newSiteId, { $push: { pastOperations: operationId } });
+    }
+    async function updateVehicle(existingOperation, vehicle, operationDays) {
+        // Remove the operation from the old vehicle's past operations
+        await Vehicle.findByIdAndUpdate(existingOperation.vehicle, {
+            $pull: {
+                Status: { operationId: operationId },
+                pastOperations: operationId,
+            },
+        });
 
+        // Add the operation to the new vehicle's past operations
+        await Vehicle.findByIdAndUpdate(vehicle, { $push: { pastOperations: existingOperation._id } });
+
+        // Update the vehicle's unavailability
+        const vehicleUnavailability = operationDays.map(date => ({ date, operationId: existingOperation._id }));
+        await Vehicle.findByIdAndUpdate(vehicle, { $push: { Status: { $each: vehicleUnavailability } } });
+    }
+
+    async function updateTechnicians(existingOperation, technicians, operationDays) {
+        // Remove the operation from the old technicians' past operations and Status
+        await Technician.updateMany({ _id: { $in: existingOperation.technicians } }, { $pull: { pastOperations: existingOperation._id, Status: { operationId: existingOperation._id } } });
+
+        // Add the operation to the new technicians' past operations
+        await Technician.updateMany({ _id: { $in: technicians } }, { $push: { pastOperations: existingOperation._id } });
+
+        // Update the technicians' unavailability
+        const techniciansUnavailability = operationDays.map(date => ({ date, operationId: existingOperation._id }));
+        const techniciansUpdatePromises = technicians.map(async (technicianId) => {
+            await Technician.findByIdAndUpdate(technicianId, { $push: { Status: { $each: techniciansUnavailability } } });
+        });
+        await Promise.all(techniciansUpdatePromises);
+    }
+
+    async function updateOperationDays(existingOperation, operationDays, technicians, vehicle) {
+        // Update the operation days in the existing operation
+        existingOperation.operationDays = operationDays;
+
+        // Update the technicians' and vehicle's unavailability
+        await updateTechnicians(existingOperation, technicians, operationDays);
+        await updateVehicle(existingOperation, vehicle, operationDays);
+    }
+
+        if (site && site !== existingOperation.site) {
+            const oldSite = await Site.findById(existingOperation.site);
+            const oldSiteGeofence = oldSite.geofence;
+
+            // Send a request to delete the old site's permission
+            const oldSitePermissionPayload = {
+                groupId: existingOperation.group,
+                geofenceId: oldSiteGeofence,
+            };
+            await sendRequest('delete', `https://demo4.traccar.org/api/permissions`, oldSitePermissionPayload);
+
+            // Get the new site's geofence
+            const newSite = await Site.findById(site);
+            const newSiteGeofence = newSite.geofence;
+
+            // Send a request to add the new site's permission
+            const newSitePermissionPayload = {
+                groupId: existingOperation.group,
+                geofenceId: newSiteGeofence,
+            };
+            await sendRequest('post', `https://demo4.traccar.org/api/permissions`, newSitePermissionPayload);
+            await updateSite(existingOperation.site, site, operationId);
+        }
+
+        // Update the operation days if they have changed
+        if (operationDays && operationDays !== existingOperation.operationDays) {
+            await updateOperationDays(existingOperation, operationDays, technicians, vehicle);
+        }
+
+        // Update the technicians if they have changed
+        if (technicians && technicians !== existingOperation.technicians) {
             const oldTechnicians = existingOperation.technicians;
-            const remainedTechnicians = oldTechnicians.filter(oldTech => technicians.some(newTech => newTech === oldTech));
-            const removedTechnicians = oldTechnicians.filter(oldTech => !technicians.some(newTech => newTech === oldTech));
-            const addedOrReplacedTechnicians = technicians.filter(newTech => !oldTechnicians.some(oldTech => newTech === oldTech));
-
-
-//const result = await operation.updateOne({_id: req.params.id}, req.body);
-
-            if (remainedTechnicians.length > 0) {
-                //send the update information
+            const remainedTechnicians = oldTechnicians.filter(oldTech => technicians.some(newTech => newTech.toString() === oldTech.toString()));
+            const removedTechnicians = oldTechnicians.filter(oldTech => !technicians.some(newTech => newTech.toString() === oldTech.toString()));
+            const addedOrReplacedTechnicians = technicians.filter(newTech => !oldTechnicians.some(oldTech => newTech.toString() === oldTech.toString()));
+            console.log("oldTechnicians",removedTechnicians);
+            console.log("newTechnicians",addedOrReplacedTechnicians);
+            console.log("remainedTechnicians",remainedTechnicians);
+            // Send a request to update each old technician's group to 0
+            for (const oldTechId of removedTechnicians) {
+                const oldTech = await Technician.findById(oldTechId);
+                if (!oldTech) {
+                    console.error(`Technician with ID ${oldTechId} not found`);
+                    continue;
+                }
+                const oldTechPayload = {
+                    id: oldTech.device,
+                    groupId: 0,
+                    name: oldTech.Fullname,
+                    uniqueId: oldTech._id
+                };
+                await sendRequest('put', `https://demo4.traccar.org/api/devices/${oldTech.device}`, oldTechPayload);
             }
-            if (removedTechnicians.length > 0) {
-                //send the bye bye information
-            }
-            if (addedOrReplacedTechnicians.length > 0) {
-                //send the new operation information
-            }
-        } else {
-            await pullTechnicians(existingOperation);
 
-            try {
-                await technicienVerification(existingOperation.technicians, operationDays);
-                console.log('All technicians are available.');
-            } catch (error) {
-                console.error(error.message);
-                return res.status(400).json({
-                    status: 'error',
-                    message: error.message,
-                });
+            // Send a request to update each new technician's group to the operation's group
+            for (const newTechId of addedOrReplacedTechnicians) {
+                const newTech = await Technician.findById(newTechId);
+                if (!newTech) {
+                    console.error(`Technician with ID ${newTechId} not found`);
+                    continue;
+                }
+                const newTechPayload = {
+                    id: newTech.device,
+                    groupId: existingOperation.group,
+                    name: newTech.Fullname,
+                    uniqueId: newTech._id
+                };
+                await sendRequest('put', `https://demo4.traccar.org/api/devices/${newTech.device}`, newTechPayload);
             }
-            await updateTechniciansUnavailabilityAndPastOperations(operationId, technicians, operationDays);
-        //    const result = await operation.updateOne({_id: req.params.id}, req.body);
-            //send the update information tcm
-
+            await updateTechnicians(existingOperation, technicians, operationDays);
         }
 
-    } else {
-
-        if (vehicle !== undefined) {
-
-            try {
-                await checkVehicleAvailability(vehicle, operationDays);
-                console.log('Vehicle is available.');
-            } catch (error) {
-                console.error(error.message);
-                return res.status(400).json({
-                    status: 'error',
-                    message: error.message,
-                });
-
-            }
-            await pullVehicle(existingOperation);
-            await updateVehicleUnavailability(vehicle, operationDays, operationId);
-            await Vehicle.updateOne({ _id: vehicle }, { $push: { pastOperations:operationId } });
-
+        // Update the vehicle if it has changed
+        if (vehicle && vehicle !== existingOperation.vehicle) {
+            const oldveh = await Vehicle.findById(existingOperation.vehicle);
+            const oldVehiclePayload = {
+                id: oldveh.device,
+                groupId: 0,
+                name: oldveh.licensePlate,
+                uniqueId: oldveh._id
+            };
+            await sendRequest('put', `https://demo4.traccar.org/api/devices/${oldveh.device}`, oldVehiclePayload);
+            const newveh = await Vehicle.findById(vehicle);
+            // Send a request to update the new vehicle's group to the operation's group
+            const newVehiclePayload = {
+                id: newveh.device,
+                groupId: existingOperation.group,
+                name: newveh.licensePlate,
+                uniqueId: newveh._id
+            };
+            await sendRequest('put', `https://demo4.traccar.org/api/devices/${newveh.device}`, newVehiclePayload);
+            await updateVehicle(existingOperation, vehicle, operationDays);
         }
-        if (technicians !== undefined) {
-            await pullTechnicians(existingOperation);
-            try {
-                await technicienVerification(technicians, operationDays);
-                console.log('All technicians are available.');
-            } catch (error) {
-                console.error(error.message);
-                return res.status(400).json({
-                    status: 'error',
-                    message: error.message,
-                });
+        Object.assign(existingOperation, req.body);
+        // Save the updated operation
+        const updatedOperation = await existingOperation.save();
 
+        res.status(200).json({
+            status: 'success',
+            data: {
+                operation: updatedOperation
             }
-            await updateTechniciansUnavailabilityAndPastOperations(operationId, technicians, operationDays);
-            const oldTechnicians = existingOperation.technicians;
-            const remainedTechnicians = oldTechnicians.filter(oldTech => technicians.some(newTech => newTech === oldTech));
-            const removedTechnicians = oldTechnicians.filter(oldTech => !technicians.some(newTech => newTech === oldTech));
-            const addedOrReplacedTechnicians = technicians.filter(newTech => !oldTechnicians.some(oldTech => newTech === oldTech));
+        });
 
-
-//const result = await operation.updateOne({_id: req.params.id}, req.body);
-
-            if (remainedTechnicians.length > 0) {
-                //send the update information
-            }
-            if (removedTechnicians.length > 0) {
-                //send the bye bye information
-            }
-            if (addedOrReplacedTechnicians.length > 0) {
-                //send the new operation information
-            }
-        } else {
-
-            //send the update information tcm
-        }
-    }
-    if (!existingOperation) {
-        return next('No operation found with that ID', 404);
-    }
-
-    res.status(200);
-
-
-    next()
 });
+//     let { site, operationDays, technicians, vehicle } = req.body;
+//     const existingOperation = await operation.findByIdAndUpdate(req.params.id, req.body, {
+//         runValidators: false
+//     });
+//     const operationId = existingOperation._id;
+//     if (site !== undefined) {
+//         await Site.findByIdAndUpdate(existingOperation.site, {$pull: {pastOperations: req.params.id}});
+//         await Site.updateOne({_id: site}, {$push: {pastOperations: req.params.id}});
+//     }
+//     if (operationDays !== undefined) {
+//
+//         if (vehicle !== undefined) {
+//
+//             try {
+//                 await checkVehicleAvailability(vehicle, operationDays);
+//                 console.log('Vehicle is available.');
+//             } catch (error) {
+//                 console.error(error.message);
+//                 return res.status(400).json({
+//                     status: 'error',
+//                     message: error.message,
+//                 });
+//
+//             }
+//             await pullVehicle(existingOperation);
+//
+//             await updateVehicleUnavailability(vehicle, operationDays, operationId);
+//             await Vehicle.updateOne({ _id: vehicle }, { $push: { pastOperations:operationId } });
+//
+//
+//         } else {
+//             await pullVehicle(existingOperation);
+//             try {
+//                 await checkVehicleAvailability(existingOperation.vehicle, operationDays);
+//                 console.log('Vehicle is available.');
+//             } catch (error) {
+//                 console.error(error.message);
+//                 return res.status(400).json({
+//                     status: 'error',
+//                     message: error.message,
+//                 });
+//
+//             }
+//             await updateVehicleUnavailability(vehicle, operationDays, operationId);
+//             await Vehicle.updateOne({ _id: vehicle }, { $push: { pastOperations:operationId } });
+//
+//         }
+//
+//         if (technicians !== undefined) {
+//             await pullTechnicians(existingOperation);
+//             try {
+//                 await technicienVerification(technicians, operationDays);
+//                 console.log('All technicians are available.');
+//             } catch (error) {
+//                 console.error(error.message);
+//                 return res.status(400).json({
+//                     status: 'error',
+//                     message: error.message,
+//                 });
+//
+//             }
+//             await updateTechniciansUnavailabilityAndPastOperations(operationId, technicians, operationDays);
+//
+//
+//             const oldTechnicians = existingOperation.technicians;
+//             const remainedTechnicians = oldTechnicians.filter(oldTech => technicians.some(newTech => newTech === oldTech));
+//             const removedTechnicians = oldTechnicians.filter(oldTech => !technicians.some(newTech => newTech === oldTech));
+//             const addedOrReplacedTechnicians = technicians.filter(newTech => !oldTechnicians.some(oldTech => newTech === oldTech));
+//
+//
+// //const result = await operation.updateOne({_id: req.params.id}, req.body);
+//
+//             if (remainedTechnicians.length > 0) {
+//                 //send the update information
+//             }
+//             if (removedTechnicians.length > 0) {
+//                 //send the bye bye information
+//             }
+//             if (addedOrReplacedTechnicians.length > 0) {
+//                 //send the new operation information
+//             }
+//         } else {
+//             await pullTechnicians(existingOperation);
+//
+//             try {
+//                 await technicienVerification(existingOperation.technicians, operationDays);
+//                 console.log('All technicians are available.');
+//             } catch (error) {
+//                 console.error(error.message);
+//                 return res.status(400).json({
+//                     status: 'error',
+//                     message: error.message,
+//                 });
+//             }
+//             await updateTechniciansUnavailabilityAndPastOperations(operationId, technicians, operationDays);
+//         //    const result = await operation.updateOne({_id: req.params.id}, req.body);
+//             //send the update information tcm
+//
+//         }
+//
+//     } else {
+//
+//         if (vehicle !== undefined) {
+//
+//             try {
+//                 await checkVehicleAvailability(vehicle, operationDays);
+//                 console.log('Vehicle is available.');
+//             } catch (error) {
+//                 console.error(error.message);
+//                 return res.status(400).json({
+//                     status: 'error',
+//                     message: error.message,
+//                 });
+//
+//             }
+//             await pullVehicle(existingOperation);
+//             await updateVehicleUnavailability(vehicle, operationDays, operationId);
+//             await Vehicle.updateOne({ _id: vehicle }, { $push: { pastOperations:operationId } });
+//
+//         }
+//         if (technicians !== undefined) {
+//             await pullTechnicians(existingOperation);
+//             try {
+//                 await technicienVerification(technicians, operationDays);
+//                 console.log('All technicians are available.');
+//             } catch (error) {
+//                 console.error(error.message);
+//                 return res.status(400).json({
+//                     status: 'error',
+//                     message: error.message,
+//                 });
+//
+//             }
+//             await updateTechniciansUnavailabilityAndPastOperations(operationId, technicians, operationDays);
+//             const oldTechnicians = existingOperation.technicians;
+//             const remainedTechnicians = oldTechnicians.filter(oldTech => technicians.some(newTech => newTech === oldTech));
+//             const removedTechnicians = oldTechnicians.filter(oldTech => !technicians.some(newTech => newTech === oldTech));
+//             const addedOrReplacedTechnicians = technicians.filter(newTech => !oldTechnicians.some(oldTech => newTech === oldTech));
+//
+//
+// //const result = await operation.updateOne({_id: req.params.id}, req.body);
+//
+//             if (remainedTechnicians.length > 0) {
+//                 //send the update information
+//             }
+//             if (removedTechnicians.length > 0) {
+//                 //send the bye bye information
+//             }
+//             if (addedOrReplacedTechnicians.length > 0) {
+//                 //send the new operation information
+//             }
+//         } else {
+//
+//             //send the update information tcm
+//         }
+//     }
+//     if (!existingOperation) {
+//         return next('No operation found with that ID', 404);
+//     }
+//
+//     res.status(200);
+//
+//
+//     next()
+// });
 
 exports.deleteOperation = catchAsync(async (req, res, next) => {
     const Operation = await operation.findById(req.params.id);
@@ -296,24 +542,29 @@ exports.deleteOperation = catchAsync(async (req, res, next) => {
                 status: 'error',
                 message: "You can't delete a completed operation",
             });
-        } else if (Operation.status === 'In Progress') {
-            // If status is "In Progress", change status to "Canceled"
-            Operation.status = 'Canceled';
-            await Operation.save();
-        } else if (Operation.status === 'Planned') {
-            // If status is "Planned", delete the operation
-            await Operation.remove();
+        } else if (Operation.status === 'In Progress' || Operation.status === 'Planned') {
+            const groupId = Operation.group; // replace this with the actual group id
+            await sendRequest('delete', `https://demo4.traccar.org/api/groups/${groupId}`);
+            // Update technicians to remove the operation from their unavailability
+            await pullTechnicians(Operation);
+
+            // Update vehicle to remove the operation from its unavailability
+            await pullVehicle(Operation);
+
+            // Update site to remove the operation from its pastOperations
+            await Site.findByIdAndUpdate(Operation.site, { $pull: { pastOperations: operationId } });
+
+            if (Operation.status === 'Planned') {
+                // If status is "Planned", delete the operation
+                await Operation.remove();
+            } else {
+                // If status is "In Progress", change status to "Canceled"
+                Operation.status = 'Canceled';
+                await Operation.save();
+            }
         }
-
-        // Update technicians to remove the operation from their unavailability
-        await pullTechnicians(Operation);
-
-        // Update vehicle to remove the operation from its unavailability
-        await pullVehicle(Operation);
-
-        // Update site to remove the operation from its pastOperations
-        await Site.findByIdAndUpdate(Operation.site, { $pull: { pastOperations: operationId } });
     }
+
 
     res.status(204).json({
         status: 'success',
@@ -328,12 +579,13 @@ exports.completeOperation = async (req, res, next) => {
         if (!Operation) {
             return res.status(404).json({ message: 'Operation not found' });
         }
-
+        const groupId = Operation.group; // replace this with the actual group id
+        await sendRequest('delete', `https://demo4.traccar.org/api/groups/${groupId}`);
         await Technician.updateMany(
             { _id: { $in: Operation.technicians } },
             {
                 $pull: {
-                    unavailability: { operationId: operationId },
+                    Status: { operationId: operationId },
                 },
             }
         );
@@ -341,7 +593,7 @@ exports.completeOperation = async (req, res, next) => {
             Operation.vehicle,
             {
                 $pull: {
-                    unavailability: { operationId: operationId },
+                    Status: { operationId: operationId },
                 },
             }
         );
@@ -426,6 +678,40 @@ exports.Dashboard = async (req, res, next) => {
     );
     next()
 };
+exports.Map = async (req, res, next) => {
+    const operations = await operation.find({ status:'In Progress'}).populate({
+        path: 'technicians',
+        select: 'Fullname lastName firstName phoneNumber',
+        options: { virtuals: true }
+    })
+        .populate({
+            path: 'responsable',
+            options: { virtuals: true },
+            select: 'Fullname lastName firstName phoneNumber'
+        })
+
+        .populate({
+            path: 'driver',
+            select: 'Fullname lastName firstName ',
+            options: { virtuals: true }
+        })
+        .populate({
+            path: 'vehicle',
+            select: 'licensePlate brand model seats'
+        })
+        .populate({
+            path: 'site',
+            select: 'name address state city'
+        });
+
+
+    res.status(200).json(
+
+        operations
+
+    );
+    next()
+};
 
 async function technicienVerification(technicians,operationDays) {
 
@@ -435,13 +721,17 @@ async function technicienVerification(technicians,operationDays) {
 
             if (!technician) {
                 return null; // Handle missing technician
-            } else if ( technician.disponibility !== "disponible") {
+            } else if (!technician.disponibility) {
                 return technician._id;
             } else {
+                const conge = await Conge.findById(technician.Congé);
 
                 for (const date of operationDays) {
                     const formattedDate = new Date(date).toISOString();
-                    if (technician.unavailability.some(unavailableDate => unavailableDate.date.toISOString() === formattedDate)) {
+                    if (conge && conge.vacationDates.some(vacationDate => vacationDate.toISOString() === formattedDate)) {
+                        return technician._id;
+                    }
+                    if (technician.Status.some(unavailableDate => unavailableDate.date.toISOString() === formattedDate)) {
                         return technician._id;
                     }
                 }
@@ -471,7 +761,7 @@ async function checkVehicleAvailability(vehicle,operationDays) {
     } else {
         for (const date of operationDays) {
             const formattedDate = new Date(date).toISOString();
-            if (vehicule && vehicule.unavailability.some((unavailableDate =>  unavailableDate.date.toISOString() === formattedDate))) {
+            if (vehicule && vehicule.Status.some((unavailableDate =>  unavailableDate.date.toISOString() === formattedDate))) {
                 const errorMessage = `The vehicle is unavailable for the specified operation period.`;
                 throw new Error(errorMessage);
             }
@@ -488,7 +778,7 @@ async function pullTechnicians(operation) {
             { _id: { $in: technicians } },
             {
                 $pull: {
-                    unavailability: { operationId: operationId },
+                    Status: { operationId: operationId },
                     pastOperations: operationId,
                 },
             }
@@ -507,7 +797,7 @@ async function pullVehicle(operation) {
             vehicle,
             {
                 $pull: {
-                    unavailability: { operationId: operationId },
+                    Status: { operationId: operationId },
                     pastOperations: operationId,
                 },
             }
@@ -525,7 +815,7 @@ async function updateVehicleUnavailability(vehicleId, operationDays, newOperatio
 
         const result = await Vehicle.findByIdAndUpdate(
             vehicleId,
-            { $push: { unavailability: { $each: vehicleUnavailability } } },
+            { $push: { Status: { $each: vehicleUnavailability } } },
             { new: true }
         );
 
@@ -542,7 +832,7 @@ async function updateTechniciansUnavailabilityAndPastOperations(operationId, tec
         const techniciansUpdatePromises = technicians.map(async (technicianId) => {
             await Technician.findByIdAndUpdate(
                 technicianId,
-                { $push: { unavailability: { $each: techniciansUnavailability } } },
+                { $push: { Status: { $each: techniciansUnavailability } } },
                 { new: true }
             );
         });

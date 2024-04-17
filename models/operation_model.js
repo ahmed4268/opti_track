@@ -49,7 +49,9 @@ const operationSchema = new mongoose.Schema({
             ref: 'Vehicle',
         },
 
-
+group: {
+    type:Number,
+},
     status: {
         type: String,
         enum: ['Planned', 'In Progress', 'Completed',"Canceled"],
@@ -184,7 +186,7 @@ operationSchema.path('driver').validate({
 // });
 operationSchema.path('technicians').validate({
     validator: function(value) {
-        return value.length >= 2;
+        return value.length >= 1;
     },
     message: 'An operation must have at least two technicians.',
 });

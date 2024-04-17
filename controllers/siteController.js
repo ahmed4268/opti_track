@@ -1,6 +1,10 @@
 const site = require('../models/siteModel');
 const APIFeatures = require('./../utils/apiFeatures');
 const catchAsync = require('./../utils/catchAsync');
+const axios = require('axios');
+// const adminKey =uNfum2arPXDFpwJrieGMaL6CEEtOinAkf9afGd6w5ebhsFcl;
+// const apiKey =PPDnoir69epGxtQlk07ueRzk6cF76Hft;
+// const projectId=d0d3aef3-c1ee-40ba-9f88-ac305aa12fa6;
 
 exports.getAllSite = catchAsync(async (req, res, next) => {
   const features = new APIFeatures(site.find(), req.query)
@@ -12,9 +16,7 @@ exports.getAllSite = catchAsync(async (req, res, next) => {
 
   // SEND RESPONSE
   res.status(200).json(
-
       sites
-
   );
   next()
 });
@@ -34,16 +36,48 @@ exports.getSite = catchAsync(async (req, res, next) => {
   });
 });
 
-exports.createSite= catchAsync(async (req, res, next) => {
+exports.createSite = catchAsync(async (req, res, next) => {
+  // Create the new site
   const newSite = await site.create(req.body);
 
-  res.status(201).json({
-    status: 'success',
-    data: {
-      site: newSite
-    }
-  });
-  next()
+  // Extract necessary information for fence creation from the newly created site
+  const { name, coordinates,_id } = newSite;
+
+  // Define fence creation payload
+  const fencePayload = {
+    name: `${name}_fence`, // Assuming you want to name the fence based on the site name
+    type: "Feature",
+    geometry: {
+      radius: 75,
+      type: "Point",
+      shapeType: "Circle", // Replace with your desired shape type
+      coordinates: coordinates
+    },
+    properties: {
+      site_id: _id.toString()
+    } // You can add optional properties here
+  };
+
+  try {
+    // Make POST request to create fence
+    const response = await axios.post("https://api.tomtom.com/geofencing/1/projects/d0d3aef3-c1ee-40ba-9f88-ac305aa12fa6/fence?key=PPDnoir69epGxtQlk07ueRzk6cF76Hft&adminKey=uNfum2arPXDFpwJrieGMaL6CEEtOinAkf9afGd6w5ebhsFcl",fencePayload);
+
+    // Log successful fence creation
+    console.log('Fence created successfully:', response.data);
+
+    // Send response to client
+    res.status(201).json({
+      status: 'success',
+      data: {
+        site: newSite,
+        fence: response.data
+      }
+    });
+  } catch (error) {
+    // Handle errors
+    console.error('Error creating fence:', error);
+    next(error);
+  }
 });
 
 exports.updateSite = catchAsync(async (req, res, next) => {

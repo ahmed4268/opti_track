@@ -14,5 +14,6 @@ router
     .patch(vehController.updatevehicule)
     .delete(vehController.deletevehicule);
 router.post('/availableveh',vehController.getAvailableveh);
+router.post('/availableveh_update',vehController.getAvailableveh_update);
 
 module.exports = router;

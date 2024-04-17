@@ -29,7 +29,12 @@ const vehicleSchema = new mongoose.Schema({
         required: true,
         unique: true,
     },
-    unavailability: [
+
+    device: {
+        type: Number,
+    },
+
+    Status: [
         {
             operationId: {
                 type: mongoose.Schema.Types.ObjectId,
@@ -47,6 +52,7 @@ const vehicleSchema = new mongoose.Schema({
         enum: ['disponible', 'indisponible'],
         default: 'disponible',
     },
+    //tetna7a
     pastOperations: [
         {
 

@@ -19,21 +19,24 @@ const siteSchema = new mongoose.Schema(
             minlength: [10, 'A site address must have more or equal then 10 characters']
         },
         coordinates: {
-            type: String
-           ,
-            required: true,
+            type: [Number], //string
+            required: true
         },
         state: {
             type: String,
             required: true,
         },
+        geofence: {
+            type:Number,
+        }
+        ,
         city: {
             type: String,
             required: true,
         },
+        //tetna7a
         pastOperations: [
             {
-
                 type: mongoose.Schema.Types.ObjectId,
                 ref: 'Operation',
             },

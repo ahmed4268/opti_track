@@ -5,6 +5,7 @@ const router = express.Router();
 
 router.get('/archive', operationController.archivedOperation);
 router.get('/dashboard', operationController.Dashboard);
+router.get('/map', operationController.Map);
 
 router
     .route('/')

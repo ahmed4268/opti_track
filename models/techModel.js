@@ -33,7 +33,7 @@ const {ObjectId} = require("mongodb");
                 message: 'Phone number must be 8 digits long.',
             },
         },
-        unavailability: [
+        Status: [
             {
                 operationId: {
                     type: mongoose.Schema.Types.ObjectId,
@@ -46,10 +46,16 @@ const {ObjectId} = require("mongodb");
                 },
             },
         ],
-        disponibility: {
-            type: String,
-            enum: ['disponible', 'indisponible'],
-            default: 'disponible',
+        Congé:
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'Congé',
+            }
+        ,
+         disponibility : {
+            type: Boolean,
+            default: true,
+
         },
 
         specialization: {
@@ -63,7 +69,10 @@ const {ObjectId} = require("mongodb");
 
         }
         ,
-
+        device:{
+        type:Number,
+        },
+//tetna7a
         pastOperations: [
             {
 
