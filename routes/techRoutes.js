@@ -2,6 +2,7 @@ const express = require('express');
 const techController = require('../controllers/techController');
 const router = express.Router();
 
+router.get('/mobile', techController.gettechmobile);
 
 router
     .route('/')
@@ -15,5 +16,6 @@ router
     .delete(techController.deletetech);
 router.post('/availabletech', techController.getAvailableTech);
 router.post('/availabletech_update', techController.getAvailableTech_update);
+
 
 module.exports = router;

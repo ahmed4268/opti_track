@@ -18,7 +18,7 @@ const {ObjectId} = require("mongodb");
         Email: {
             type: String,
             required: true,
-            unique:true,
+            unique:[true,"Email already exists"],
 
         },
         phoneNumber: {
@@ -46,11 +46,12 @@ const {ObjectId} = require("mongodb");
                 },
             },
         ],
-        Congé:
+        Conge:[
             {
                 type: mongoose.Schema.Types.ObjectId,
-                ref: 'Congé',
+                ref: 'Conge',
             }
+            ]
         ,
          disponibility : {
             type: Boolean,
@@ -64,13 +65,17 @@ const {ObjectId} = require("mongodb");
         },
         Permis:{
         type:String,
-            enum: ['car', 'truck', 'plane XD'],
+            enum: ['car', 'truck'],
         required:true,
 
         }
         ,
         device:{
         type:Number,
+        },
+        currentOperation: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Operation',
         },
 //tetna7a
         pastOperations: [

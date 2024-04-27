@@ -4,8 +4,6 @@ const catchAsync = require('./../utils/catchAsync');
 const Site = require('../models/siteModel');
 const Technician = require('../models/techModel');
 const Vehicle = require('../models/vehModel');
-const tech = require("../models/techModel");
-const Conge = require('../models/congeModel');
 const axios = require("axios"); // Import the Congé model
 
 exports.getAllOperation = catchAsync(async (req, res, next) => {
@@ -81,7 +79,7 @@ exports.getOperation = catchAsync(async (req, res, next) => {
         }
     });
 });
-const credentials = Buffer.from('ahmedhorizon2021@gmail.com:dHaB5uAZ9tC!M4K').toString('base64');
+const credentials = Buffer.from('mohamedouesalti080@gmail.com:RZedi!Z9MpqnF@K').toString('base64');
 
 async function sendRequest(method, url, payload) {
     try {
@@ -191,7 +189,7 @@ exports.createOperation = catchAsync(async (req, res, next) => {
 
 exports.updateOperation = catchAsync(async (req, res, next) => {
 
-        const { site, operationDays, technicians, vehicle } = req.body;
+        const { site, operationDays, technicians, vehicle ,endTime,startTime} = req.body;
         const operationId = req.params.id;
 
         const existingOperation = await operation.findById(operationId);
@@ -352,6 +350,27 @@ exports.updateOperation = catchAsync(async (req, res, next) => {
             await sendRequest('put', `https://demo4.traccar.org/api/devices/${newveh.device}`, newVehiclePayload);
             await updateVehicle(existingOperation, vehicle, operationDays);
         }
+    const operationStartTime = new Date(startTime);
+    const operationEndTime = new Date(endTime);
+   console.log('Operation start time:', operationStartTime);
+    console.log('Operation end time:', operationEndTime);
+    // Get the current time
+    const currentTime = new Date();
+
+    // Compare the current time with the operation's start and end times
+    if (currentTime < operationStartTime) {
+        // If the current time is before the operation's start time, set the operation's status to 'Planned'
+        existingOperation.status = 'Planned';
+    } else if (currentTime >= operationStartTime && currentTime <= operationEndTime) {
+        // If the current time is after the operation's start time but before its end time, set the operation's status to 'In Progress'
+        existingOperation.status = 'In Progress';
+        const techniciens=req.body.technicians;
+        for (const technician of techniciens) {
+            const  technicien= await Technician.findById(technician);
+            technicien.currentOperation =operationId;
+            await technicien.save();
+        }
+    }
         Object.assign(existingOperation, req.body);
         // Save the updated operation
         const updatedOperation = await existingOperation.save();
@@ -681,23 +700,23 @@ exports.Dashboard = async (req, res, next) => {
 exports.Map = async (req, res, next) => {
     const operations = await operation.find({ status:'In Progress'}).populate({
         path: 'technicians',
-        select: 'Fullname lastName firstName phoneNumber',
+        select: 'Fullname lastName firstName device phoneNumber',
         options: { virtuals: true }
     })
         .populate({
             path: 'responsable',
             options: { virtuals: true },
-            select: 'Fullname lastName firstName phoneNumber'
+            select: 'Fullname lastName firstName device phoneNumber'
         })
 
         .populate({
             path: 'driver',
-            select: 'Fullname lastName firstName ',
+            select: 'Fullname lastName device firstName ',
             options: { virtuals: true }
         })
         .populate({
             path: 'vehicle',
-            select: 'licensePlate brand model seats'
+            select: 'licensePlate brand model  device seats'
         })
         .populate({
             path: 'site',
@@ -712,24 +731,26 @@ exports.Map = async (req, res, next) => {
     );
     next()
 };
-
 async function technicienVerification(technicians,operationDays) {
 
     const unavailableTechnicians = await Promise.all(
         technicians.map(async (technicianId) => {
-            const technician = await tech.findById(technicianId);
+            const technician = await Technician.findById(technicianId).populate('Conge');
 
             if (!technician) {
                 return null; // Handle missing technician
             } else if (!technician.disponibility) {
                 return technician._id;
             } else {
-                const conge = await Conge.findById(technician.Congé);
-
                 for (const date of operationDays) {
                     const formattedDate = new Date(date).toISOString();
-                    if (conge && conge.vacationDates.some(vacationDate => vacationDate.toISOString() === formattedDate)) {
-                        return technician._id;
+                    if (technician.Conge && technician.Conge.length > 0) {
+                        const activeConges = technician.Conge.filter(conge => !conge.archived);
+                        for (const conge of activeConges) {
+                            if (formattedDate >= conge.startDate && formattedDate <= conge.returnDate) {
+                                return technician._id;
+                            }
+                        }
                     }
                     if (technician.Status.some(unavailableDate => unavailableDate.date.toISOString() === formattedDate)) {
                         return technician._id;

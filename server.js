@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const scheduler = require('./schedular'); // Adjust the path accordingly
 const WebSocketHandler = require('./test'); // Path to WebSocketHandler.js file
+const http = require('http');
 
 const axios = require('axios'); // Make sure to install axios using npm install axios
 
@@ -20,20 +21,20 @@ mongoose
 
   })
   .then(() => console.log('DB connection successful!'));
-
+const server = http.createServer( app);
 const port =  3001;
-const server = app.listen(port, () => {
+ server.listen(port, () => {
   console.log(`App running on port ${port}...`);
-    // const webSocketHandler = new WebSocketHandler('demo.traccar.org', 'SDBGAiEA2FGiqwpHXnD4RGD8BKRBSaXOVms9-PXh4QH1DaFR9JoCIQDYh0kTUZRAbTlH0FLo-0wjB1_bhuMwOWKID-jW-6tOEHsidSI6NTUwMjYsImUiOiIyMDI1LTAxLTIxVDIzOjAwOjAwLjAwMCswMDowMCJ9');
-    // axios.post('https://webhook.site/b90434db-31b7-402a-9439-05a50b9aec47', {
-    //     message: 'Hi'
-    // })
-    //     .then(response => {
-    //         console.log('Webhook responded with:', response.data);
-    //     })
-    //     .catch(error => {
-    //         console.error('Error sending request to webhook:', error);
-    //     });
+    // const webSocketHandler = new WebSocketHandler('demo4.traccar.org', 'SDBGAiEA9VDBxY9YfxfolCFrGFnx9Uq9QqoDohArgrTL0fMevcICIQDTq-H4uyA4f70VHrmzBozOEHekgoLRf7zSFRKuFZXtsHsidSI6MjM2NTcsImUiOiIyMDI1LTA0LTI2VDIzOjAwOjAwLjAwMCswMDowMCJ9');
+//     axios.post('https://webhook.site/b90434db-31b7-402a-9439-05a50b9aec47', {
+//         message: 'Hi'
+//     })
+//         .then(response => {
+//             console.log('Webhook responded with:', response.data);
+//         })
+//         .catch(error => {
+//             console.error('Error sending request to webhook:', error);
+//         });
 });
 
 

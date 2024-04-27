@@ -18,8 +18,16 @@ const siteSchema = new mongoose.Schema(
             maxlength: [40, 'A site address must have less or equal then 40 characters'],
             minlength: [10, 'A site address must have more or equal then 10 characters']
         },
-        coordinates: {
-            type: [Number], //string
+        // coordinates: {
+        //     type: [Number], //string
+        //     required: true
+        // },
+        longitude: {
+            type: Number,
+            required: true
+        },
+        latitude: {
+            type: Number,
             required: true
         },
         state: {

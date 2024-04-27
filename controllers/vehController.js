@@ -13,19 +13,17 @@ exports.getAllvehicules = catchAsync(async (req, res, next) => {
     const veh = await features.query;
 
     // SEND RESPONSE
-    res.status(200).json({
-        status: 'success',
-        results: veh.length,
-        data: {
-            veh
-        }
-    });
+    res.status(200).json(
+
+        veh
+
+    );
     next()
 });
 exports.getAvailableveh = catchAsync(async (req, res, next) => {
 
     try {
-        const{ operationDays ,technumber}= req.body;
+        const{ operationDays ,technumber,Permis}= req.body;
         if (!operationDays) {
 
             return next('Please provide operation days in the request body.', 400);
@@ -34,7 +32,8 @@ exports.getAvailableveh = catchAsync(async (req, res, next) => {
         const availablevehicules = await vehi.find({
             disponibility: "disponible",
             Status: { $not: { $elemMatch: { date: { $in: operationDays } } } },
-            seats: { $gte: technumber }
+            seats: { $gte: technumber },
+            type:Permis
         });
 
         res.json(availablevehicules);
@@ -46,7 +45,7 @@ exports.getAvailableveh = catchAsync(async (req, res, next) => {
 exports.getAvailableveh_update = catchAsync(async (req, res, next) => {
 
     try {
-        const{ operationDays ,technumber,vehicule}= req.body;
+        const{ operationDays,Permis ,technumber,operation_id}= req.body;
         if (!operationDays) {
 
             return next('Please provide operation days in the request body.', 400);
@@ -54,11 +53,14 @@ exports.getAvailableveh_update = catchAsync(async (req, res, next) => {
 
         let availablevehicules = await vehi.find({
             disponibility: "disponible",
-            Status: { $not: { $elemMatch: { date: { $in: operationDays } } } },
-            seats: { $gte: technumber }
+            seats: { $gte: technumber },
+            type: Permis,
+            $or: [
+                { Status: { $not: { $elemMatch: { date: { $in: operationDays } } } } },
+                { Status: { $elemMatch: { date: { $in: operationDays }, operationId: operation_id } } }
+            ]
         });
-        let vehiculee = await vehi.findById(vehicule);
-            availablevehicules.push(vehiculee);
+
         res.json(availablevehicules);
     } catch (error) {
         console.error("Error fetching available technicians:", error);
@@ -81,6 +83,7 @@ exports.getvehicule = catchAsync(async (req, res, next) => {
 });
 
 exports.createvehicule= catchAsync(async (req, res, next) => {
+    try {
     const newvehicule = await vehi.create(req.body);
     const { licensePlate,_id } = newvehicule;
     const vehPayload = {
@@ -88,9 +91,9 @@ exports.createvehicule= catchAsync(async (req, res, next) => {
         uniqueId:_id,
         category: "vehicule",
     };
-    const credentials = Buffer.from('ahmedhorizon2021@gmail.com:dHaB5uAZ9tC!M4K').toString('base64');
+    const credentials = Buffer.from('mohamedouesalti080@gmail.com:RZedi!Z9MpqnF@K').toString('base64');
 
-    try {
+
 
         const response = await axios.post("https://demo4.traccar.org/api/devices",vehPayload,{
 
@@ -113,6 +116,11 @@ exports.createvehicule= catchAsync(async (req, res, next) => {
             }
         });
     } catch (error) {
+        if (error.message.includes("licensePlate_1 dup key")) {
+            console.log("license already exists")
+            return res.status(410).json({message:"license already exists"})}
+
+
         // Handle errors
         console.error('Error creating device:', error);
         next(error);
@@ -123,6 +131,7 @@ exports.createvehicule= catchAsync(async (req, res, next) => {
 });
 
 exports.updatevehicule = catchAsync(async (req, res, next) => {
+    try {
     const veh = await vehi.findByIdAndUpdate(req.params.id, req.body, {
         new: true,
         runValidators: true
@@ -133,13 +142,14 @@ exports.updatevehicule = catchAsync(async (req, res, next) => {
     }
     const { licensePlate, _id } = veh;
     const vehPayload = {
+        id: veh.device,
         name: licensePlate,
         uniqueId: _id,
         category: "vehicule",
     };
-    const credentials = Buffer.from('ahmedhorizon2021@gmail.com:dHaB5uAZ9tC!M4K').toString('base64');
+    const credentials = Buffer.from('mohamedouesalti080@gmail.com:RZedi!Z9MpqnF@K').toString('base64');
 
-    try {
+
         const response = await axios.put(`https://demo4.traccar.org/api/devices/${veh.device}`, vehPayload, {
             headers: {
                 Authorization: `Basic ${credentials}`
@@ -156,6 +166,10 @@ exports.updatevehicule = catchAsync(async (req, res, next) => {
             }
         });
     } catch (error) {
+        console.error("error",error.message)
+        if (error.message.includes("licensePlate_1 dup key")) {
+            console.log("license already exists")
+            return res.status(410).json({message:"license already exists"})}
         console.error('Error updating device:', error);
         next(error);
     }
@@ -169,7 +183,7 @@ exports.deletevehicule = catchAsync(async (req, res, next) => {
     if (!veh) {
         return next('No car found with that ID', 404);
     }
-    const credentials = Buffer.from('ahmedhorizon2021@gmail.com:dHaB5uAZ9tC!M4K').toString('base64');
+    const credentials = Buffer.from('mohamedouesalti080@gmail.com:RZedi!Z9MpqnF@K').toString('base64');
 
     try {
         const response = await axios.delete(`https://demo4.traccar.org/api/devices/${veh.device}`, {

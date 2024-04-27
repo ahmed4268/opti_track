@@ -1,6 +1,12 @@
-const mongoose = require('mongoose');
 
-const vacationPeriodSchema = new mongoose.Schema({
+
+const mongoose = require('mongoose');
+const congeSchema = new mongoose.Schema({
+    technician: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Technician',
+        required: true
+    },
     startDate: {
         type: Date,
         required: true
@@ -13,8 +19,22 @@ const vacationPeriodSchema = new mongoose.Schema({
         type: Date,
         required: true
     },
-}, { _id: false });
-vacationPeriodSchema.virtual('vacationDates').get(function() {
+    type: {
+        type: String,
+        enum: ['MALADIE', 'ANNUEL','AUTRE'],
+        required: true
+    },
+   status: {
+        type: String,
+        enum: ['up coming', 'now', 'passed'],
+        default: 'up coming'
+    },
+    archived: {
+        type: Boolean,
+        default: false
+    }
+});
+congeSchema.virtual('vacationDates').get(function() {
     const dates = [];
     let currentDate = new Date(this.startDate);
 
@@ -26,43 +46,31 @@ vacationPeriodSchema.virtual('vacationDates').get(function() {
     return dates;
 });
 
-const congeSchema = new mongoose.Schema({
-    technician: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Technician',
-        required: true
-    },
-    vacationPeriods: {
-        type: [vacationPeriodSchema], // Array of vacation periods
-        required: true
-    },
+congeSchema.pre('save', async function(next) {
+    const overlappingConges = await mongoose.models.Conge.find({
+        technician: this.technician,
+        $or: [
+            { $and: [{ startDate: { $lte: this.endDate } }, { endDate: { $gte: this.startDate } }] },
+            { $and: [{ startDate: { $lte: this.returnDate } }, { returnDate: { $gte: this.startDate } }] },
+            { $and: [{ endDate: { $lte: this.returnDate } }, { returnDate: { $gte: this.endDate } }] }
+        ]
+    });
 
-});
-
-// Custom validator to check for overlapping vacations
-congeSchema.path('vacationPeriods').validate(async function(value) {
-    for (const vacationPeriod of value) {
-        const overlappingVacations = await mongoose.models.Conge.find({
-            technician: this.technician,
-            vacationPeriods: {
-                $elemMatch: {
-                    $or: [
-                        { $and: [{ startDate: { $lte: vacationPeriod.endDate } }, { endDate: { $gte: vacationPeriod.startDate } }] },
-                        { $and: [{ startDate: { $lte: vacationPeriod.returnDate } }, { returnDate: { $gte: vacationPeriod.startDate } }] },
-                        { $and: [{ endDate: { $lte: vacationPeriod.returnDate } }, { returnDate: { $gte: vacationPeriod.endDate } }] }
-                    ]
-                }
-            }
-        });
-
-        if (overlappingVacations.length > 0) {
-            return false;
-        }
+    if (overlappingConges.length > 0) {
+        throw new Error('Congé overlaps with existing congés');
     }
 
-    return true;
-}, 'Vacation overlaps with existing vacations');
-
+    next();
+});
+//   congeSchema.methods.archiveOldConges = async function() {
+//     const currentDate = new Date();
+//     const result = await this.updateMany(
+//         { returnDate: { $lt: currentDate } },
+//         { archived: true }
+//     );
+//
+//     console.log(`Archived ${result.nModified} old Congés.`);
+// };
 const Conge = mongoose.model('Conge', congeSchema);
 
 module.exports = Conge;
