@@ -1,23 +1,23 @@
 const express = require('express');
 const operationController = require('../controllers/OperationController');
-
+const authController = require('../controllers/authController');
 const router = express.Router();
 
-router.get('/archive', operationController.archivedOperation);
-router.get('/dashboard', operationController.Dashboard);
-router.get('/map', operationController.Map);
+router.get('/archive',authController.protect,authController.restrictTo('ChefProjet','admin'), operationController.archivedOperation);
+router.get('/dashboard', authController.protect,authController.restrictTo('ChefProjet','admin'),operationController.Dashboard);
+router.get('/map', authController.protect,authController.restrictTo('ChefProjet','admin'),operationController.Map);
 
 router
     .route('/')
-    .get(operationController.getAllOperation)
-    .post(operationController.createOperation);
+    .get(authController.protect,authController.restrictTo('ChefProjet','admin'),operationController.getAllOperation)
+    .post(authController.protect,authController.restrictTo('ChefProjet','admin'),operationController.createOperation);
 
 router
     .route('/:id')
-    .get(operationController.getOperation)
-    .patch(operationController.updateOperation)
-    .delete(operationController.deleteOperation)
-router.patch('/:id/complete', operationController.completeOperation);
+    .get(authController.protect,authController.restrictTo('ChefProjet','admin'),operationController.getOperation)
+    .patch(authController.protect,authController.restrictTo('ChefProjet','admin'),operationController.updateOperation)
+    .delete(authController.protect,authController.restrictTo('ChefProjet','admin'),operationController.deleteOperation)
+router.patch('/:id/complete', authController.protect,authController.restrictTo('ChefProjet','admin'),operationController.completeOperation);
 
 
 

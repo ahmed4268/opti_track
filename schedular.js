@@ -53,14 +53,13 @@ const updateOperationStatus = async () => {
         for (const operation of operations) {
             // Update operation status
             operation.status = 'In Progress';
-            await operation.save();
-
             const technicians = operation.technicians;
-
+            await operation.save();
             for (const technician of technicians) {
-             const  technicien=Technician.findById(technician);
+                const  technicien= await Technician.findById(technician);
                 technicien.currentOperation = operation._id;
-                await technicien.save();
+              await technicien.save();
+                console.log("aaaa",technicien.currentOperation)
             }
 
             console.log(`Operation ${operation._id} updated successfully.`);

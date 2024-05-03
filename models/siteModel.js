@@ -8,7 +8,7 @@ const siteSchema = new mongoose.Schema(
             unique: true,
             trim: true,
             maxlength: [40, 'A site name must have less or equal then 40 characters'],
-            minlength: [10, 'A site name must have more or equal then 10 characters']
+            minlength: [5, 'A site name must have more or equal then 10 characters']
 
         },
 
@@ -40,6 +40,10 @@ const siteSchema = new mongoose.Schema(
         ,
         city: {
             type: String,
+            required: true,
+        },
+        distance: {
+            type: Number,
             required: true,
         },
         //tetna7a

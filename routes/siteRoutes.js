@@ -1,18 +1,19 @@
 const express = require('express');
 const siteController = require('../controllers/siteController');
+const authController = require('../controllers/authController');
 
 const router = express.Router();
 
 
 router
   .route('/')
-  .get(siteController.getAllSite)
-  .post(siteController.createSite);
+  .get(authController.protect,siteController.getAllSite)
+  .post(authController.protect,authController.restrictTo('Planifcateur','admin'),siteController.createSite);
 
 router
   .route('/:id')
-  .get(siteController.getSite)
-  .patch(siteController.updateSite)
-  .delete(siteController.deleteSite);
+  .get(authController.protect,siteController.getSite)
+  .patch(authController.protect,authController.restrictTo('Planifcateur','admin'),siteController.updateSite)
+  .delete(authController.protect,authController.restrictTo('Planifcateur','admin'),siteController.deleteSite);
 
 module.exports = router;

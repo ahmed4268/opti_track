@@ -5,9 +5,15 @@ const Site = require('../models/siteModel');
 const Technician = require('../models/techModel');
 const Vehicle = require('../models/vehModel');
 const axios = require("axios"); // Import the Congé model
-
+const Presence = require('../models/PresenceModel');
+const dayjs = require('dayjs');
 exports.getAllOperation = catchAsync(async (req, res, next) => {
-    const features = new APIFeatures(operation.find().populate({
+console.log(req.user)
+        let filter = {};
+        if (req.user.role !== 'admin')
+            filter = { user: req.user._id };
+
+    const features = new APIFeatures(operation.find(filter).populate({
         path: 'technicians',
         select: 'Fullname lastName firstName phoneNumber',
         options: { virtuals: true }
@@ -46,6 +52,7 @@ exports.getAllOperation = catchAsync(async (req, res, next) => {
 });
 
 exports.getOperation = catchAsync(async (req, res, next) => {
+
     const Operation = await operation.findById(req.params.id).populate({
     path: 'technicians',
         select: 'Fullname lastName firstName phoneNumber'
@@ -71,13 +78,16 @@ exports.getOperation = catchAsync(async (req, res, next) => {
     if (!Operation) {
         return next('No operation found with that ID', 404);
     }
+    if (req.user.role !== 'admin' || operation.user !== req.user._id) {
 
-    res.status(200).json({
-        status: 'success',
-        data: {
-            Operation
-        }
-    });
+        res.status(200).json({
+            status: 'success',
+            data: {
+                Operation
+            }
+        });
+    }else         return next('You do not have permission to access this operation', 403);
+
 });
 const credentials = Buffer.from('mohamedouesalti080@gmail.com:RZedi!Z9MpqnF@K').toString('base64');
 
@@ -136,6 +146,12 @@ exports.createOperation = catchAsync(async (req, res, next) => {
         geofenceId: sitee.geofence,
     };
     await sendRequest('post',"https://demo4.traccar.org/api/permissions", permissionPayload);
+    const permissionPayloadd = {
+        groupId: group,
+        geofenceId:1328
+        ,
+    };
+    await sendRequest('post',"https://demo4.traccar.org/api/permissions", permissionPayloadd);
 
     const requests = technicians.map(async (technicianId) => {
         const tech = await Technician.findById(technicianId);
@@ -195,6 +211,9 @@ exports.updateOperation = catchAsync(async (req, res, next) => {
         const existingOperation = await operation.findById(operationId);
         if (!existingOperation) {
             return next('No operation found with that ID', 404);
+        }
+        if (existingOperation.user !== req.user._id||req.user.role !== 'admin') {
+            return next('You do not have permission to update this operation', 403);
         }
 
         try {
@@ -371,8 +390,10 @@ exports.updateOperation = catchAsync(async (req, res, next) => {
             await technicien.save();
         }
     }
+
         Object.assign(existingOperation, req.body);
         // Save the updated operation
+        existingOperation.user=req.user._id;
         const updatedOperation = await existingOperation.save();
 
         res.status(200).json({
@@ -555,7 +576,9 @@ exports.deleteOperation = catchAsync(async (req, res, next) => {
 
     if (!Operation) {
         return next('No Operation found with that ID', 404);
-    } else {
+    } else if (Operation.user !== req.user._id||req.user.role !== 'admin') {
+        return next('You do not have permission to delete this operation', 403);
+    } else{
         if (Operation.status === 'Completed') {
             return res.status(400).json({
                 status: 'error',
@@ -591,21 +614,116 @@ exports.deleteOperation = catchAsync(async (req, res, next) => {
     });
 });
 
+async function middleware(operation) {
+    console.log(operation)
+
+    // Step 3: Get the technicians and the operation
+    const technicians = operation.technicians;
+    const operationId = operation._id;
+const start=operation.startTime.toISOString();
+    const end=operation.endTime.toISOString();
+    let startdateObj = dayjs(start);
+    let enddateObj = dayjs(end);
+
+
+    startdateObj = startdateObj.add(1, 'hour');
+    enddateObj = enddateObj.add(1, 'hour');
+
+
+    let startdate = startdateObj.toISOString();
+   let enddate = enddateObj.toISOString();
+    const responses = await axios.get(`https://demo4.traccar.org/api/reports/summary?groupId=${operation.group}&from=${startdate}&to=${enddate}`,{
+        headers: {
+        Authorization: `Basic ${credentials}`,
+            Accept: 'application/json',
+           'Content-Type':'application/json'
+    }
+    })
+    console.log(responses)
+console.log(`https://demo4.traccar.org/api/reports/events?groupId=${operation.group}&from=${startdate}&to=${enddate}&type=geofenceEnter&type=geofenceExit`)
+    const response = await sendRequest('get',`https://demo4.traccar.org/api/reports/events?groupId=${operation.group}&from=${startdate}&to=${enddate}&type=geofenceEnter&type=geofenceExit`);
+    if(response&&responses){
+
+    const filteredEvents = response.filter(event => event.geofenceId === operation.site.geofence);
+
+    for (const technician of technicians) {
+        const tech= await Technician.findById(technician);
+        const Events = filteredEvents.filter(event =>  event.deviceId === tech.device);
+        Events.sort((a, b) => new Date(a.eventTime) - new Date(b.eventTime));
+        let enterTime = null;
+        let totalTime = 0;
+        for (const event of Events) {
+            console.log(event)
+            if (event.type === 'geofenceEnter') {
+                enterTime = new Date(event.eventTime);
+            } else if (event.type === 'geofenceExit' && enterTime) {
+
+                const exitTime = new Date(event.eventTime);
+                const timeSpent = exitTime - enterTime;
+console.log("enterTime",enterTime)
+                console.log("exitTime",exitTime)
+
+                console.log("timeSpent",timeSpent)
+                totalTime += timeSpent;
+                enterTime = null;
+            }
+        }
+        const deviceData = responses.data.find(device => device.deviceId === tech.device);
+        const traveledDistance = deviceData ? Number((deviceData.distance/ 1000).toFixed(2)) : 0;
+       let totalTimeInHours = totalTime / (1000 * 60 * 60);
+        totalTimeInHours=Number(totalTimeInHours.toFixed(2));
+        const newPresence = {
+            timeSpend:totalTimeInHours,
+            operationId: operationId,
+            traveledDistance:traveledDistance,
+            site: operation.site.name,
+            driver: operation.driver._id===tech._id,
+            responsable: operation.responsable.Fullname,
+            technician:tech._id
+        }
+console.log(newPresence)
+        await Presence.create(newPresence);
+    }
+    }
+    const groupId = operation.group;
+    console.log(groupId,"deleti")
+    await sendRequest('delete', `https://demo4.traccar.org/api/groups/${groupId}`);
+}
+
 exports.completeOperation = async (req, res, next) => {
     try {
-        const operationId = req.params.id;
-        const Operation = await operation.findByIdAndUpdate(operationId,{ status: 'Completed' });
-        if (!Operation) {
+        const Operationn = await operation.findById(req.params.id);
+        if (!Operationn) {
             return res.status(404).json({ message: 'Operation not found' });
         }
-        const groupId = Operation.group; // replace this with the actual group id
-        await sendRequest('delete', `https://demo4.traccar.org/api/groups/${groupId}`);
+        if(Opeartionn.user!==req.user._id||req.user.role !== 'admin'){
+            return next('You do not have permission to complete this operation', 403);
+        }
+        const operationId = req.params.id;
+        const Operation = await operation.findByIdAndUpdate(operationId,{ status: 'Completed' })
+            .populate({
+            path:'site',
+            select:"geofence duration",
+        }).populate({
+            path:'responsable',
+            options: { virtuals: true },
+        select: 'Fullname lastName firstName'
+        });
+
+
+            await middleware(Operation);
+
+
+
         await Technician.updateMany(
             { _id: { $in: Operation.technicians } },
             {
                 $pull: {
                     Status: { operationId: operationId },
                 },
+                $set: {
+                    currentOperation: null
+                }
             }
         );
         await Vehicle.findByIdAndUpdate(
@@ -630,25 +748,30 @@ exports.completeOperation = async (req, res, next) => {
     }
 };
 exports.archivedOperation = async (req, res, next) => {
-    const operations = await operation.find({ status: { $in: ['Completed', 'Canceled'] } }).populate({
+    let filter = {};
+    if (req.user.role !== 'admin') {
+        filter = { user: req.user._id };
+    }
+
+    const operations = await operation.find({ status: { $in: ['Completed', 'Canceled'] }, ...filter }).populate({
         path: 'technicians',
-        select: 'Fullname lastName firstName phoneNumber',
+        select: 'Fullname lastName firstName device phoneNumber',
         options: { virtuals: true }
     })
         .populate({
             path: 'responsable',
             options: { virtuals: true },
-            select: 'Fullname lastName firstName phoneNumber'
+            select: 'Fullname lastName firstName device phoneNumber'
         })
 
         .populate({
             path: 'driver',
-            select: 'Fullname lastName firstName ',
+            select: 'Fullname lastName device firstName ',
             options: { virtuals: true }
         })
         .populate({
             path: 'vehicle',
-            select: 'licensePlate brand model seats'
+            select: 'licensePlate brand model  device seats'
         })
         .populate({
             path: 'site',
@@ -664,7 +787,11 @@ exports.archivedOperation = async (req, res, next) => {
     next()
 };
 exports.Dashboard = async (req, res, next) => {
-    const operations = await operation.find({ status: { $in: ['Planned', 'In Progress'] } }).populate({
+    let filter = {};
+    if (req.user.role !== 'admin') {
+        filter = { user: req.user._id };
+    }
+    const operations = await operation.find({ status: { $in: ['Planned', 'In Progress'] },...filter }).populate({
         path: 'technicians',
         select: 'Fullname lastName firstName phoneNumber',
         options: { virtuals: true }
@@ -698,7 +825,11 @@ exports.Dashboard = async (req, res, next) => {
     next()
 };
 exports.Map = async (req, res, next) => {
-    const operations = await operation.find({ status:'In Progress'}).populate({
+    let filter = {};
+    if (req.user.role !== 'admin') {
+        filter = { user: req.user._id };
+    }
+    const operations = await operation.find({ status:'In Progress',...filter}).populate({
         path: 'technicians',
         select: 'Fullname lastName firstName device phoneNumber',
         options: { virtuals: true }
@@ -720,7 +851,7 @@ exports.Map = async (req, res, next) => {
         })
         .populate({
             path: 'site',
-            select: 'name address state city'
+            select: 'name address state city geofence'
         });
 
 

@@ -2,6 +2,9 @@ const tech = require('../models/techModel');
 const APIFeatures = require('./../utils/apiFeatures');
 const catchAsync = require('./../utils/catchAsync');
 const axios = require("axios");
+const sendEmail = require("../utils/email");
+const AppError = require("../utils/appError");
+const crypto = require('crypto');
 
 exports.getAlltech = catchAsync(async (req, res, next) => {
     const features = new APIFeatures(tech.find(), req.query)
@@ -95,10 +98,18 @@ exports.gettechmobile = catchAsync(async (req, res, next) => {
     // });
     const Tech = await tech.findOne({ Email: req.query.Email }).populate({
         path:'currentOperation',
-        select:'name accessCode startTime endTime Description site responsable'
+        select:'name accessCode startTime endTime Description site responsable',
+        populate: {
+            path: 'site',
+            select: 'name address longitude latitude state geofence city ' // replace 'siteField1', 'siteField2', etc. with the actual field names you want to select in the site document
+        }
     }).populate({
         path:'pastOperations',
-        select:'name startTime endTime Description site '
+        select:'name startTime endTime Description site ',
+        populate: {
+            path: 'site',
+            select: 'name address longitude latitude state geofence city ' // replace 'siteField1', 'siteField2', etc. with the actual field names you want to select in the site document
+        }
     });
     if (!Tech) {
         return next('No technician found with that ID', 404);
@@ -134,7 +145,12 @@ exports.gettechmobile_archive = catchAsync(async (req, res, next) => {
 
 exports.createtech= catchAsync(async (req, res, next) => {
     try {
-    const newTech = await tech.create(req.body);
+        const password = crypto.randomBytes(5).toString('hex'); // 5 bytes will give a 10-character hexadecimal string
+
+        // Add the password to the request body
+        req.body.password = password;
+
+        const newTech = await tech.create(req.body);
 
     const { Fullname,_id,Email } = newTech;
     // Define fence creation payload
@@ -161,6 +177,29 @@ exports.createtech= catchAsync(async (req, res, next) => {
         newTech.device = response.data.id;
         await newTech.save();
         console.log('tech created successfully:', response.data);
+        const message = `Welcome to OptiTrack, ${newTech.Fullname}! Your account has been created successfully. Your password is ${password}. Please change your password after logging in.`;
+
+        try {
+            await sendEmail({
+                email: newTech.Email,
+                subject: 'Your password reset token (valid for 10 min)',
+                message
+            });
+
+            res.status(200).json({
+                status: 'success',
+                message: 'Token sent to email!'
+            });
+        } catch (err) {
+            user.passwordResetToken = undefined;
+            user.passwordResetExpires = undefined;
+            await user.save({ validateBeforeSave: false });
+
+            return next(
+                new AppError('There was an error sending the email. Try again later!'),
+                500
+            );
+        }
 
 
         res.status(201).json({
@@ -192,9 +231,12 @@ exports.updatetech = catchAsync(async (req, res, next) => {
 
             runValidators: true
         });
+        console
     if (!Tech) {
         return next('No technician found with that ID', 404);
     }
+    console.log(req.body)
+    console.log(Tech);
     const devicePayload = {
         id: Tech.device,
         name: Tech.Fullname,
@@ -228,15 +270,10 @@ exports.updatetech = catchAsync(async (req, res, next) => {
             return res.status(411).json({message:"phone number already exists"})
         }
         // Handle errors
-        console.error('Error creating device:', error);
+        console.error('Error updating device:', error);
         next(error);
     }
-    res.status(200).json({
-        status: 'success',
-        data: {
-            Tech
-        }
-    });
+
 });
 
 exports.deletetech = catchAsync(async (req, res, next) => {

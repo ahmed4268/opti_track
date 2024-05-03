@@ -35,52 +35,55 @@ exports.getSite = catchAsync(async (req, res, next) => {
     }
   });
 });
-
+const Sotetel = [10.210557325592731,36.8530881166092];
 exports.createSite = catchAsync(async (req, res, next) => {
-  // Create the new site
+  // Extract latitude and longitude from request body
+  const { latitude, longitude } = req.body;
+
+  // Construct waypointsString
+  const waypointsString = `36.8530881166092,10.210557325592731|${longitude},${latitude}`;
+
+  // Send GET request to Geoapify API
+  const response = await axios.get(`https://api.geoapify.com/v1/routing?waypoints=${waypointsString}&mode=drive&apiKey=e327a1988cea41ea9b80b0225c329861`);
+
+  // Extract time from response, convert to hours, and round up
+  console.log(response)
+  console.log(response.data.features[0].properties.time, 'time',response.data.features[0].properties.time / 3600)
+
+  const duration = Math.ceil(response.data.features[0].properties.time / 3600);
+
+  // Add duration to request body
+  req.body.duration = duration;
+
+  // Continue with site creation as before
   const newSite = await site.create(req.body);
 
-  // Extract necessary information for fence creation from the newly created site
-  const { name, coordinates,_id } = newSite;
-
-  // Define fence creation payload
-  const fencePayload = {
-    name: `${name}_fence`, // Assuming you want to name the fence based on the site name
-    type: "Feature",
-    geometry: {
-      radius: 75,
-      type: "Point",
-      shapeType: "Circle", // Replace with your desired shape type
-      coordinates: coordinates
-    },
-    properties: {
-      site_id: _id.toString()
-    } // You can add optional properties here
-  };
-
-  try {
-    // Make POST request to create fence
-    const response = await axios.post("https://api.tomtom.com/geofencing/1/projects/d0d3aef3-c1ee-40ba-9f88-ac305aa12fa6/fence?key=PPDnoir69epGxtQlk07ueRzk6cF76Hft&adminKey=uNfum2arPXDFpwJrieGMaL6CEEtOinAkf9afGd6w5ebhsFcl",fencePayload);
-
-    // Log successful fence creation
-    console.log('Fence created successfully:', response.data);
-
-    // Send response to client
-    res.status(201).json({
-      status: 'success',
-      data: {
-        site: newSite,
-        fence: response.data
-      }
-    });
-  } catch (error) {
-    // Handle errors
-    console.error('Error creating fence:', error);
-    next(error);
-  }
+  // Send response to client
+  res.status(201).json({
+    status: 'success',
+    data: {
+      site: newSite,
+    }
+  });
 });
 
 exports.updateSite = catchAsync(async (req, res, next) => {
+  // Extract latitude and longitude from request body
+  const { latitude, longitude } = req.body;
+
+  // Construct waypointsString
+  const waypointsString = `36.8530881166092,10.210557325592731|${longitude},${latitude}`;
+
+  // Send GET request to Geoapify API
+  const response = await axios.get(`https://api.geoapify.com/v1/routing?waypoints=${waypointsString}&mode=drive&apiKey=e327a1988cea41ea9b80b0225c329861`);
+
+  // Extract time from response, convert to hours, and round up
+  const distance = Math.round(response.data.features[0].properties.distance / 1000);
+
+  // Add duration to request body
+  req.body.distance = distance;
+
+  // Update the site
   const Site = await site.findByIdAndUpdate(req.params.id, req.body, {
     new: true,
     runValidators: true

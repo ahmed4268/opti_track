@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 const tech = require('../models/techModel');
 const vehi = require('../models/vehModel');
 const Site = require('../models/siteModel');
-
+const axios = require('axios');
+const Presence = require('./PresenceModel');
 const operationSchema = new mongoose.Schema({
     name: {
         type: String,
@@ -29,7 +30,7 @@ const operationSchema = new mongoose.Schema({
              {
                 type: mongoose.Schema.Types.ObjectId,
                 ref: 'Technician',
-
+required:true,
             },
 
     ],
@@ -47,6 +48,13 @@ const operationSchema = new mongoose.Schema({
         {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Vehicle',
+            required: true,
+        },
+        user:
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true,
         },
 
 group: {
@@ -211,7 +219,7 @@ operationSchema.virtual('duration').get(function () {
     const end = this.endTime;
     const durationInMilliseconds = end - start;
     const durationInDays = durationInMilliseconds / (1000 * 60 * 60 * 24);
-    return Math.round(durationInDays);
+    return Math.ceil(durationInDays);
 });
 // operationSchema.virtual('info').get(function () {
 //     const start = this.startTime;
@@ -220,6 +228,25 @@ operationSchema.virtual('duration').get(function () {
 //     const durationInDays = durationInMilliseconds / (1000 * 60 * 60 * 24);
 //     return Math.round(durationInDays);
 // });
+const credentials = Buffer.from('mohamedouesalti080@gmail.com:RZedi!Z9MpqnF@K').toString('base64');
+
+async function sendRequest(method, url, payload) {
+    try {
+        const response = await axios({
+            method,
+            url,
+            data: payload,
+            headers: {
+                Authorization: `Basic ${credentials}`
+            }
+        });
+        console.log('Request successful:', response.data);
+        return response.data;
+    } catch (error) {
+        console.error('Error sending request:', error);
+    }
+}
+
 const Operation = mongoose.model('Operation', operationSchema);
 
 module.exports = Operation;

@@ -2,6 +2,7 @@ const mongoose=require('mongoose');
 
 const Enum =require('enum');
 const {ObjectId} = require("mongodb");
+const bcrypt = require("bcryptjs");
 
     const technicianSchema = new mongoose.Schema({
 
@@ -21,6 +22,11 @@ const {ObjectId} = require("mongodb");
             unique:[true,"Email already exists"],
 
         },
+            password: {
+                type: String,
+                required: [true, 'Please provide a password'],
+                minlength: 8,
+            },
         phoneNumber: {
             type: String,
             required: true,
@@ -97,6 +103,16 @@ const {ObjectId} = require("mongodb");
 
 
 );
+technicianSchema.pre('save', async function(next) {
+    // Only run this function if password was actually modified
+    if (!this.isModified('password')) return next();
+
+    // Hash the password with cost of 12
+    this.password = await bcrypt.hash(this.password, 12);
+
+
+    next();
+});
 technicianSchema.virtual('Fullname').get(function () {
 
     return `${this.firstName} ${this.lastName}`;
