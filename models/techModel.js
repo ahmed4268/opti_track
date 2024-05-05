@@ -76,6 +76,9 @@ const bcrypt = require("bcryptjs");
 
         }
         ,
+            firebaseMessagingToken: {
+                type: String,
+            },
         device:{
         type:Number,
         },
@@ -104,10 +107,8 @@ const bcrypt = require("bcryptjs");
 
 );
 technicianSchema.pre('save', async function(next) {
-    // Only run this function if password was actually modified
     if (!this.isModified('password')) return next();
 
-    // Hash the password with cost of 12
     this.password = await bcrypt.hash(this.password, 12);
 
 

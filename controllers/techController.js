@@ -182,7 +182,7 @@ exports.createtech= catchAsync(async (req, res, next) => {
         try {
             await sendEmail({
                 email: newTech.Email,
-                subject: 'Your password reset token (valid for 10 min)',
+                subject: 'Your Password for OptiTrack mobile Account',
                 message
             });
 

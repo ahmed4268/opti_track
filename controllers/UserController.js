@@ -19,7 +19,7 @@ exports.getMe = (req, res, next) => {
 };
 
 exports.updateMe = catchAsync(async (req, res, next) => {
-    // 1) Create error if user POSTs password data
+
     if (req.body.password) {
         return next(
             new AppError(
@@ -110,6 +110,5 @@ AppError('There was an error sending the email. Try again later!',500)
 exports.getUser = factory.getOne(User);
 exports.getAllUsers = factory.getAll(User);
 
-// Do NOT update passwords with this!
 exports.updateUser = factory.updateOne(User);
 exports.deleteUser = factory.deleteOne(User);

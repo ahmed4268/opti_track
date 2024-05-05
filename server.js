@@ -12,7 +12,26 @@ dotenv.config({ path: './config.env' });
 const app = require('./app');
 
 const DB = process.env.DATABASE;
+app.patch('/technicians/:id/token', async (req, res) => {
+    const technicianId = req.params.id;
+    const token = req.body.token;
 
+    try {
+        const technician = await Technician.findByIdAndUpdate(
+            technicianId,
+            { firebaseMessagingToken: token },
+            { new: true }
+        );
+
+        if (!technician) {
+            res.status(404).send({ message: 'Technician not found' });
+        } else {
+            res.status(200).send({ message: 'Token updated successfully', technician });
+        }
+    } catch (error) {
+        res.status(500).send({ message: 'Error updating token', error });
+    }
+});
 
 mongoose
   .connect(DB, {

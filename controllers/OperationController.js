@@ -108,7 +108,6 @@ async function sendRequest(method, url, payload) {
     }
 }
 exports.createOperation = catchAsync(async (req, res, next) => {
-    const newOperation = await operation.create(req.body);
 
     const { technicians, vehicle, site, operationDays,name } = req.body;
     try {
@@ -124,6 +123,8 @@ exports.createOperation = catchAsync(async (req, res, next) => {
         });
 
     }
+    const newOperation = await operation.create(req.body);
+
     await updateTechniciansUnavailabilityAndPastOperations(newOperation._id, technicians, operationDays);
     await updateVehicleUnavailability(vehicle, operationDays,newOperation._id);
     await Vehicle.updateOne({ _id: vehicle }, { $push: { pastOperations: newOperation._id } });
@@ -212,7 +213,7 @@ exports.updateOperation = catchAsync(async (req, res, next) => {
         if (!existingOperation) {
             return next('No operation found with that ID', 404);
         }
-        if (existingOperation.user !== req.user._id||req.user.role !== 'admin') {
+        if ((existingOperation.user !== req.user._id) && (req.user.role !== 'admin')) {
             return next('You do not have permission to update this operation', 403);
         }
 
@@ -576,7 +577,7 @@ exports.deleteOperation = catchAsync(async (req, res, next) => {
 
     if (!Operation) {
         return next('No Operation found with that ID', 404);
-    } else if (Operation.user !== req.user._id||req.user.role !== 'admin') {
+    } else if (Operation.user !== req.user._id&&req.user.role !== 'admin') {
         return next('You do not have permission to delete this operation', 403);
     } else{
         if (Operation.status === 'Completed') {
@@ -696,7 +697,7 @@ exports.completeOperation = async (req, res, next) => {
         if (!Operationn) {
             return res.status(404).json({ message: 'Operation not found' });
         }
-        if(Opeartionn.user!==req.user._id||req.user.role !== 'admin'){
+        if(Operationn.user!==req.user._id&&req.user.role !== 'admin'){
             return next('You do not have permission to complete this operation', 403);
         }
         const operationId = req.params.id;
@@ -709,6 +710,9 @@ exports.completeOperation = async (req, res, next) => {
             options: { virtuals: true },
         select: 'Fullname lastName firstName'
         });
+
+        console.log(Operation)
+        console.log("we here")
 
 
             await middleware(Operation);
@@ -734,7 +738,7 @@ exports.completeOperation = async (req, res, next) => {
                 },
             }
         );
-
+ console.log("then here")
         res.status(200).json({
             status: 'success',
             data: Operation

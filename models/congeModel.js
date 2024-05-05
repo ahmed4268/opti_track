@@ -21,7 +21,7 @@ const congeSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ['MALADIE', 'ANNUEL','AUTRE'],
+        enum: ['MALADIE', 'ANNUEL','AUTRE','SANS SOLDE'],
         required: true
     },
    status: {

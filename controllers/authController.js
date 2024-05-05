@@ -35,18 +35,18 @@ const createSendToken = (user, statusCode, res) => {
     });
 };
 
-exports.signup = catchAsync(async (req, res, next) => {
-    const newUser = await User.create({
-        firstname: req.body.firstname,
-        phoneNumber: req.body.phoneNumber,
-        lastname: req.body.lastname,
-        email: req.body.email,
-        password: req.body.password,
-
-    });
-
-    createSendToken(newUser, 201, res);
-});
+// exports.signup = catchAsync(async (req, res, next) => {
+//     const newUser = await User.create({
+//         firstname: req.body.firstname,
+//         phoneNumber: req.body.phoneNumber,
+//         lastname: req.body.lastname,
+//         email: req.body.email,
+//         password: req.body.password,
+//
+//     });
+//
+//     createSendToken(newUser, 201, res);
+// });
 
 exports.login = catchAsync(async (req, res, next) => {
     const { email, password } = req.body;
@@ -123,7 +123,9 @@ exports.restrictTo = (...roles) => {
 
 exports.forgotPassword = catchAsync(async (req, res, next) => {
     // 1) Get user based on POSTed email
+    console.log(req.body.email)
     const user = await User.findOne({ email: req.body.email });
+
     if (!user) {
         return next(new AppError('There is no user with email address.', 404));
     }
@@ -133,11 +135,9 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
     await user.save({ validateBeforeSave: false });
 
     // 3) Send it to user's email
-    const resetURL = `${req.protocol}://${req.get(
-        'host'
-    )}/users/resetPassword/${resetToken}`;
+    const resetURL = `http://127.0.0.1:3000/resetPassword/${resetToken}`;
 
-    const message = `Forgot your password? Submit a PATCH request with your new password and passwordConfirm to: ${resetURL}.\nIf you didn't forget your password, please ignore this email!`;
+    const message = `Forgot your password?click this Url ,and rest your password : <a href=${resetURL}>Click here</a>.\nIf you didn't forget your password, please ignore this email!`;
 
     try {
         await sendEmail({
@@ -179,7 +179,6 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
         return next(new AppError('Token is invalid or has expired', 400));
     }
     user.password = req.body.password;
-    user.passwordConfirm = req.body.passwordConfirm;
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
     await user.save();
@@ -200,10 +199,10 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
 
     // 3) If so, update password
     user.password = req.body.password;
-    user.passwordConfirm = req.body.passwordConfirm;
+
     await user.save();
     // User.findByIdAndUpdate will NOT work as intended!
 
     // 4) Log user in, send JWT
-    createSendToken(user, 200, res);
+     createSendToken(user, 200, res);
 });
