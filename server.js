@@ -2,14 +2,14 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const scheduler = require('./schedular'); // Adjust the path accordingly
 const http = require('http');
-
+const cors = require('cors');
 const axios = require('axios'); // Make sure to install axios using npm install axios
 
 
 
 dotenv.config({ path: './config.env' });
 const app = require('./app');
-
+app.use(cors());
 const DB = process.env.DATABASE;
 app.patch('/technicians/:id/token', async (req, res) => {
     const technicianId = req.params.id;
