@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 const scheduler = require('./schedular'); // Adjust the path accordingly
 const http = require('http');
 const cors = require('cors');
+const helmet = require('helmet');
 const axios = require('axios'); // Make sure to install axios using npm install axios
 
 
@@ -10,6 +11,8 @@ const axios = require('axios'); // Make sure to install axios using npm install 
 dotenv.config({ path: './config.env' });
 const app = require('./app');
 app.use(cors());
+app.use(helmet.referrerPolicy({ policy: 'strict-origin-when-cross-origin' }));
+
 const DB = process.env.DATABASE;
 app.patch('/technicians/:id/token', async (req, res) => {
     const technicianId = req.params.id;
