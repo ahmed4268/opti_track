@@ -10,8 +10,7 @@ const axios = require('axios'); // Make sure to install axios using npm install 
 
 dotenv.config({ path: './config.env' });
 const app = require('./app');
-app.use(cors());
-app.use(helmet.referrerPolicy({ policy: 'strict-origin-when-cross-origin' }));
+
 
 const DB = process.env.DATABASE;
 app.patch('/technicians/:id/token', async (req, res) => {
