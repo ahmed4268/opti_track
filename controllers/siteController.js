@@ -50,10 +50,10 @@ exports.createSite = catchAsync(async (req, res, next) => {
   console.log(response)
   console.log(response.data.features[0].properties.time, 'time',response.data.features[0].properties.time / 3600)
 
-  const duration = Math.ceil(response.data.features[0].properties.time / 3600);
+  const distance = Math.round(response.data.features[0].properties.distance / 1000);
 
   // Add duration to request body
-  req.body.duration = duration;
+  req.body.distance = distance;
 
   // Continue with site creation as before
   const newSite = await site.create(req.body);

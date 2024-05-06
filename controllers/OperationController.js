@@ -614,6 +614,29 @@ exports.deleteOperation = catchAsync(async (req, res, next) => {
         data: null
     });
 });
+exports.deleteeOperation = async (req, res, next) => {
+    try {
+        const opeeration = await operation.findById(req.params.id);
+
+        if (!opeeration) {
+            return res.status(404).json({ message: 'Operation not found' });
+        }
+
+        if(opeeration.user !== req.user._id && req.user.role !== 'admin'){
+            return next('You do not have permission to delete this operation', 403);
+        }
+
+        await opeeration.remove();
+
+        res.status(204).json({
+            status: 'success',
+            data: null
+        });
+    } catch (error) {
+        console.error('Error deleting operation:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
 
 async function middleware(operation) {
     console.log(operation)

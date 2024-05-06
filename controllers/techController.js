@@ -227,11 +227,17 @@ exports.createtech= catchAsync(async (req, res, next) => {
 
 exports.updatetech = catchAsync(async (req, res, next) => {
     try {
+        const tec= await tech.findById(req.params.id);
+        if(req.body.Email&&req.body.Email!==tec.Email){
+
+        const old_email=tec.Email;
+        }
+        //oueslati haw odl email lil firebase
         const Tech = await tech.findByIdAndUpdate(req.params.id, req.body, {
 
             runValidators: true
         });
-        console
+
     if (!Tech) {
         return next('No technician found with that ID', 404);
     }
@@ -242,6 +248,9 @@ exports.updatetech = catchAsync(async (req, res, next) => {
         name: Tech.Fullname,
         uniqueId: Tech._id,
         category: "technician",
+        "attributes": {
+            "email": Tech.Email
+        }
     };
     const credentials = Buffer.from('mohamedouesalti080@gmail.com:RZedi!Z9MpqnF@K').toString('base64');
 
