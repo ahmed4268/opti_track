@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const scheduler = require('./schedular'); // Adjust the path accordingly
-const WebSocketHandler = require('./test'); // Path to WebSocketHandler.js file
 const http = require('http');
 
 const axios = require('axios'); // Make sure to install axios using npm install axios
