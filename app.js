@@ -20,7 +20,9 @@ const axios = require('axios'); // Make sure to install axios using npm install 
 
 
 const app = express();
-app.use(helmet());
+app.use(cors());
+app.use(helmet.referrerPolicy({ policy: 'strict-origin-when-cross-origin' }));
+
 
 // const limiter = rateLimit({
 //   max: 150,
