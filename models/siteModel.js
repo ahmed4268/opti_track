@@ -44,7 +44,6 @@ const siteSchema = new mongoose.Schema(
         },
         distance: {
             type: Number,
-            required: true,
         },
         //tetna7a
         pastOperations: [

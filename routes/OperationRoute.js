@@ -13,11 +13,12 @@ router
     .post(authController.protect,authController.restrictTo('ChefProjet','admin'),operationController.createOperation);
 
 router
-    .route('/:id')
+    .route('/op/:id')
     .get(authController.protect,authController.restrictTo('ChefProjet','admin'),operationController.getOperation)
     .patch(authController.protect,authController.restrictTo('ChefProjet','admin'),operationController.updateOperation)
     .delete(authController.protect,authController.restrictTo('ChefProjet','admin'),operationController.deleteOperation)
 router.patch('/:id/complete', authController.protect,authController.restrictTo('ChefProjet','admin'),operationController.completeOperation);
+router.delete('/:id/def', authController.protect,authController.restrictTo('ChefProjet','admin'),operationController.deleteeOperation);
 
 
 
