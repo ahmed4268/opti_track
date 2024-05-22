@@ -23,7 +23,7 @@ mongoose
   })
   .then(() => console.log('DB connection successful!'));
 const server = http.createServer( app);
-const port =  4000;
+const port =10000;
  server.listen(port, () => {
   console.log(`App running on port ${port}...`);
     // const webSocketHandler = new WebSocketHandler('demo4.traccar.org', 'SDBGAiEA9VDBxY9YfxfolCFrGFnx9Uq9QqoDohArgrTL0fMevcICIQDTq-H4uyA4f70VHrmzBozOEHekgoLRf7zSFRKuFZXtsHsidSI6MjM2NTcsImUiOiIyMDI1LTA0LTI2VDIzOjAwOjAwLjAwMCswMDowMCJ9');
