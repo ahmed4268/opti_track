@@ -4,6 +4,25 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 
 router.get('/mobile', techController.gettechmobile);
+router.patch('/technicians/:email/token', async (req, res) => {
+    const technicianEmail = req.params.email;
+    const token = req.body.token;
+    try {
+        const technician = await Technician.findOneAndUpdate(
+            { Email: technicianEmail },
+            { firebaseMessagingToken: token },
+            { new: true, useFindAndModify: false }
+        );
+
+        if (!technician) {
+            return res.status(404).send({ message: 'Technician not found' });
+        } else {
+            return res.status(200).send({ message: 'Token updated successfully', technician });
+        }
+    } catch (error) {
+        return res.status(500).send({ message: 'Error updating token', error });
+    }
+});
 
 router
     .route('/')
