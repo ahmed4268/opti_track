@@ -7,6 +7,7 @@ router.get('/mobile', techController.gettechmobile);
 router.patch('/technicians/:email/token', async (req, res) => {
     const technicianEmail = req.params.email;
     const token = req.body.token;
+    console.log("aazaz",token,technicianEmail)
     try {
         const technician = await Technician.findOneAndUpdate(
             { Email: technicianEmail },
@@ -20,6 +21,7 @@ router.patch('/technicians/:email/token', async (req, res) => {
             return res.status(200).send({ message: 'Token updated successfully', technician });
         }
     } catch (error) {
+        console.log("err",error)
         return res.status(500).send({ message: 'Error updating token', error });
     }
 });
