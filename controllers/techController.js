@@ -99,10 +99,21 @@ exports.gettechmobile = catchAsync(async (req, res, next) => {
     const Tech = await tech.findOne({ Email: req.query.Email }).populate({
         path:'currentOperation',
         select:'name accessCode startTime endTime Description site responsable',
-        populate: {
-            path: 'site',
-            select: 'name address longitude latitude state geofence city ' // replace 'siteField1', 'siteField2', etc. with the actual field names you want to select in the site document
-        }
+        select:'name accessCode startTime endTime Description site driver responsable',
+        populate: [
+            {
+                path: 'site',
+                select: 'name address longitude latitude state geofence city'
+            },
+            {
+                path: 'responsable',
+                select: 'firstName lastName Fullname'
+            },
+            {
+                path: 'driver',
+                select: 'firstName lastName Fullname'
+            }
+        ]
     }).populate({
         path:'pastOperations',
         select:'name startTime endTime Description site ',
