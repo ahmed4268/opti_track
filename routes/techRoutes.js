@@ -2,7 +2,7 @@ const express = require('express');
 const techController = require('../controllers/techController');
 const router = express.Router();
 const authController = require('../controllers/authController');
-
+const Technician=require('../models/techModel');
 router.get('/mobile', techController.gettechmobile);
 router.patch('/technicians/:email/token', async (req, res) => {
     const technicianEmail = req.params.email;
