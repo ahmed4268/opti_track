@@ -98,11 +98,15 @@ exports.gettechmobile = catchAsync(async (req, res, next) => {
     // });
     const Tech = await tech.findOne({ Email: req.query.Email }).populate({
         path:'currentOperation',
-        select:'name accessCode startTime endTime Description site driver responsable',
+        select:'name accessCode startTime endTime Description vehicle site driver responsable',
         populate: [
             {
                 path: 'site',
                 select: 'name address longitude latitude state geofence city'
+            },
+             {
+                path: 'vehicle',
+                select: 'licensePlate brand model'
             },
             {
                 path: 'responsable',
