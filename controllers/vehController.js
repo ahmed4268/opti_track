@@ -177,29 +177,29 @@ exports.updatevehicule = catchAsync(async (req, res, next) => {
 
 
 
-exports.deletevehicule = catchAsync(async (req, res, next) => {
-    const veh = await vehi.findByIdAndDelete(req.params.id);
-
-    if (!veh) {
-        return next('No car found with that ID', 404);
-    }
-    const credentials = Buffer.from('mohamedouesalti080@gmail.com:RZedi!Z9MpqnF@K').toString('base64');
-
-    try {
-        const response = await axios.delete(`https://demo4.traccar.org/api/devices/${veh.device}`, {
-            headers: {
-                Authorization: `Basic ${credentials}`
-            }
-        });
-
-        console.log('Vehicle deleted successfully:', response.data);
-
-        res.status(204).json({
-            status: 'success',
-            data: null
-        });
-    } catch (error) {
-        console.error('Error deleting device:', error);
-        next(error);
-    }
-});
+// exports.deletevehicule = catchAsync(async (req, res, next) => {
+//     const veh = await vehi.findByIdAndDelete(req.params.id);
+//
+//     if (!veh) {
+//         return next('No car found with that ID', 404);
+//     }
+//     const credentials = Buffer.from('mohamedouesalti080@gmail.com:RZedi!Z9MpqnF@K').toString('base64');
+//
+//     try {
+//         const response = await axios.delete(`https://demo4.traccar.org/api/devices/${veh.device}`, {
+//             headers: {
+//                 Authorization: `Basic ${credentials}`
+//             }
+//         });
+//
+//         console.log('Vehicle deleted successfully:', response.data);
+//
+//         res.status(204).json({
+//             status: 'success',
+//             data: null
+//         });
+//     } catch (error) {
+//         console.error('Error deleting device:', error);
+//         next(error);
+//     }
+// });
